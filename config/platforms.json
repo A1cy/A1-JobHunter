@@ -1,23 +1,6 @@
 {
   "platforms": [
     {
-      "id": "adzuna",
-      "name": "Adzuna API",
-      "url": "https://api.adzuna.com",
-      "requiresJS": false,
-      "priority": 0,
-      "enabled": true,
-      "api": {
-        "app_id": "ADZUNA_APP_ID",
-        "api_key": "ADZUNA_API_KEY",
-        "country": "sa"
-      },
-      "search_params": {
-        "location": "Riyadh",
-        "keywords": ["AI Engineer", "Machine Learning Engineer", "GenAI Developer", "Digital Transformation Specialist", "Full Stack Developer", "ML Engineer", "MLOps Engineer"]
-      }
-    },
-    {
       "id": "linkedin",
       "name": "LinkedIn Jobs",
       "url": "https://www.linkedin.com/jobs",
