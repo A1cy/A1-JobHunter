@@ -70,11 +70,12 @@ async function main() {
     logger.info(`✅ Found ${jobs.length} jobs from ${new Set(jobs.map(j => j.platform)).size} platforms`);
 
     if (jobs.length === 0) {
-      logger.warn('⚠️ No jobs found. Notifying user...');
+      logger.warn('⚠️ No jobs found. Notifying user with error details...');
 
+      // sendToTelegram now handles 0 jobs case internally
       await sendToTelegram([]);
 
-      logger.info('✅ Job hunt complete (no results)');
+      logger.info('✅ Job hunt complete (no results) - User notified');
       return;
     }
 
@@ -88,9 +89,10 @@ async function main() {
     if (matchedJobs.length === 0) {
       logger.warn('⚠️ No jobs passed matching threshold');
 
+      // sendToTelegram now handles 0 jobs case internally
       await sendToTelegram([]);
 
-      logger.info('✅ Job hunt complete (no matches)');
+      logger.info('✅ Job hunt complete (no matches) - User notified');
       return;
     }
 

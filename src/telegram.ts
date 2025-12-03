@@ -69,6 +69,61 @@ function splitIntoMessages(jobs: Job[], maxCharsPerMessage: number = 4000): stri
 }
 
 /**
+ * Send notification when no jobs are found
+ */
+export async function sendNoJobsNotification(platforms: string[], issues?: string[]): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    logger.error('TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set');
+    return;
+  }
+
+  try {
+    const bot = new Telegraf(botToken);
+
+    const date = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    let message = `⚠️ *A1 Job Hunter - ${date}*\n`;
+    message += `No jobs found matching your criteria today.\n\n`;
+    message += `📊 *Scan Details:*\n`;
+    message += `• Platforms scanned: ${platforms.join(', ')}\n`;
+    message += `• Scan mode: ${process.env.MODE || 'Adaptive'}\n`;
+
+    if (issues && issues.length > 0) {
+      message += `\n🚨 *Issues Detected:*\n`;
+      issues.forEach(issue => {
+        message += `• ${issue}\n`;
+      });
+    }
+
+    message += `\n🔍 *Possible Reasons:*\n`;
+    message += `• No new jobs posted in Riyadh today\n`;
+    message += `• Platforms may be blocking automated access\n`;
+    message += `• Keywords may need adjustment\n`;
+
+    message += `\n💡 *Next Steps:*\n`;
+    message += `• Check again tomorrow at 9:00 AM\n`;
+    message += `• Manually verify job boards if urgent\n`;
+    message += `• Consider updating search keywords\n`;
+
+    message += `\n🤖 *Powered by A1 Job Hunter*\n`;
+    message += `⏰ Next automated scan: Tomorrow at 9:00 AM Riyadh time`;
+
+    await bot.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+
+    logger.info('No-jobs notification sent to Telegram');
+  } catch (error) {
+    logger.error('Error sending no-jobs notification:', error);
+  }
+}
+
+/**
  * Send jobs to Telegram
  */
 export async function sendToTelegram(jobs: Job[]): Promise<void> {
@@ -82,7 +137,8 @@ export async function sendToTelegram(jobs: Job[]): Promise<void> {
   }
 
   if (jobs.length === 0) {
-    logger.warn('No jobs to send to Telegram');
+    logger.warn('No jobs found - sending notification');
+    await sendNoJobsNotification(['LinkedIn Jobs', 'Indeed Saudi', 'Bayt'], ['All platforms blocked by anti-bot detection (403 Forbidden)']);
     return;
   }
 
