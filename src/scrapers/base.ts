@@ -1,10 +1,15 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium as playwrightChromium } from 'playwright-extra';
+import stealth from 'puppeteer-extra-plugin-stealth';
+import { Browser, Page } from 'playwright';
 import * as cheerio from 'cheerio';
 import got from 'got';
 import Bottleneck from 'bottleneck';
 import pRetry from 'p-retry';
 import RobotsParser from 'robots-parser';
 import { getRandomUserAgent, logger, Job, generateJobId } from '../utils.js';
+
+// Apply stealth plugin to playwright
+playwrightChromium.use(stealth());
 
 export interface PlatformConfig {
   id: string;
@@ -84,20 +89,36 @@ export abstract class BaseScraper {
   }
 
   /**
-   * Initialize Playwright browser
+   * Initialize Playwright browser with enhanced stealth
    */
   protected async initBrowser(): Promise<void> {
     if (!this.browser) {
-      this.browser = await chromium.launch({
+      this.browser = await playwrightChromium.launch({
         headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
-          '--disable-blink-features=AutomationControlled'
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
         ]
       });
     }
+  }
+
+  /**
+   * Get random referrer for more realistic requests
+   */
+  protected getRandomReferer(): string {
+    const referers = [
+      'https://www.google.com/search?q=jobs+riyadh',
+      'https://www.google.sa/',
+      'https://www.linkedin.com/',
+      'https://www.indeed.com/',
+      'https://www.bayt.com/',
+      'https://www.tanqeeb.com/'
+    ];
+    return referers[Math.floor(Math.random() * referers.length)];
   }
 
   /**
@@ -109,19 +130,38 @@ export abstract class BaseScraper {
   }
 
   /**
-   * Scrape with Playwright (for JS-heavy sites)
+   * Scrape with Playwright (for JS-heavy sites) - Enhanced stealth
    */
   protected async scrapeWithBrowser(url: string, extractFn: (page: Page) => Promise<Job[]>): Promise<Job[]> {
     if (!this.browser) {
       await this.initBrowser();
     }
 
-    const page = await this.browser!.newPage();
+    // Create context with realistic browser fingerprint
+    const context = await this.browser!.newContext({
+      viewport: {
+        width: 1920 + Math.floor(Math.random() * 100),
+        height: 1080 + Math.floor(Math.random() * 100)
+      },
+      userAgent: getRandomUserAgent(),
+      locale: 'en-US',
+      timezoneId: 'Asia/Riyadh',
+      geolocation: { longitude: 46.6753, latitude: 24.7136 }, // Riyadh coordinates
+      permissions: ['geolocation'],
+    });
+
+    const page = await context.newPage();
 
     try {
-      // Set user agent
+      // Set realistic headers
       await page.setExtraHTTPHeaders({
-        'User-Agent': getRandomUserAgent()
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': this.getRandomReferer()
       });
 
       // Navigate with retry logic
@@ -142,8 +182,8 @@ export abstract class BaseScraper {
         }
       );
 
-      // Wait for content to load
-      await page.waitForTimeout(2000);
+      // Random delay to appear more human
+      await page.waitForTimeout(1500 + Math.floor(Math.random() * 1000));
 
       // Extract jobs using platform-specific logic
       const jobs = await extractFn(page);
@@ -154,28 +194,41 @@ export abstract class BaseScraper {
       return [];
     } finally {
       await page.close();
+      await context.close();
     }
   }
 
   /**
-   * Scrape with Cheerio (for static HTML sites)
+   * Scrape with Cheerio (for static HTML sites) - Enhanced headers
    */
   protected async scrapeWithCheerio(url: string, extractFn: ($: cheerio.CheerioAPI) => Job[]): Promise<Job[]> {
     try {
+      // Random delay before request to appear more human
+      await this.sleep(500 + Math.floor(Math.random() * 1000));
+
       const response = await pRetry(
         async () => {
           return await got(url, {
             headers: {
               'User-Agent': getRandomUserAgent(),
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8'
+              'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'DNT': '1',
+              'Connection': 'keep-alive',
+              'Upgrade-Insecure-Requests': '1',
+              'Referer': this.getRandomReferer(),
+              'Cache-Control': 'max-age=0'
             },
             timeout: { request: 15000 },
-            followRedirect: true
+            followRedirect: true,
+            retry: {
+              limit: 0 // Disable got's internal retry, we use pRetry instead
+            }
           });
         },
         {
-          retries: 3,
+          retries: 4,
           minTimeout: 2000,
           maxTimeout: 10000,
           onFailedAttempt: (error: any) => {
