@@ -7,8 +7,9 @@
  */
 
 import { config } from 'dotenv';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readFile, readdir } from 'fs/promises';
 import { resolve } from 'path';
+import { existsSync } from 'fs';
 import { adaptiveScan, scanAllPlatforms } from './scrapers/index.js';
 import { RSSJobScraper } from './scrapers/rss-scraper.js';
 import { WebSearchJobScraper } from './scrapers/websearch-scraper.js';
@@ -80,27 +81,63 @@ async function main() {
     // TIER 2: WEBSEARCH + AI (Unlimited, no rate limits)
     // ═══════════════════════════════════════════════════════════
     if (jobs.length < 5) {
-      logger.info('🔍 Tier 2: WebSearch + AI Parsing...');
-      logger.warn(`Only ${jobs.length} jobs from RSS, triggering WebSearch...`);
+      logger.info('🔍 Tier 2: WebSearch Results (from pre-generated data)...');
+      logger.warn(`Only ${jobs.length} jobs from RSS, loading WebSearch results...`);
 
-      const webSearchScraper = new WebSearchJobScraper();
-      const webSearchKeywords = ['AI Engineer', 'Machine Learning', 'GenAI', 'Digital Transformation'];
+      try {
+        // Check for WebSearch JSON files in data/ directory
+        const dataDir = resolve(process.cwd(), 'data');
 
-      const queries = webSearchScraper.buildSearchQueries(webSearchKeywords, 'Riyadh');
+        if (existsSync(dataDir)) {
+          const files = await readdir(dataDir);
+          const webSearchFiles = files
+            .filter(f => f.startsWith('websearch-jobs-') && f.endsWith('.json'))
+            .sort()
+            .reverse(); // Get most recent first
 
-      // Note: WebSearch integration requires Claude Code's WebSearch tool
-      // For now, log queries that would be executed
-      logger.info(`📝 Generated ${queries.length} WebSearch queries`);
-      logger.info('⚠️  WebSearch integration pending - requires Claude Code WebSearch tool during execution');
-      logger.info('💡 Skipping Tier 2 for now, moving to Tier 3...');
+          if (webSearchFiles.length > 0) {
+            const latestFile = webSearchFiles[0];
+            const filePath = resolve(dataDir, latestFile);
 
-      // TODO: Implement WebSearch tool integration when available
-      // Example usage (to be implemented):
-      // for (const query of queries.slice(0, 5)) {
-      //   const searchResults = await webSearch(query);
-      //   const searchJobs = webSearchScraper.parseSearchResults(searchResults, query, 'Riyadh');
-      //   jobs.push(...searchJobs);
-      // }
+            logger.info(`📂 Loading WebSearch data from: ${latestFile}`);
+
+            const fileContent = await readFile(filePath, 'utf-8');
+            const webSearchData = JSON.parse(fileContent);
+
+            if (webSearchData.jobs && Array.isArray(webSearchData.jobs)) {
+              // Convert WebSearch format to Job format
+              const webSearchJobs: Job[] = webSearchData.jobs.map((wsJob: any) => ({
+                id: wsJob.id || generateJobId(),
+                title: wsJob.title,
+                company: wsJob.company || 'Unknown',
+                location: wsJob.location || 'Riyadh, Saudi Arabia',
+                url: wsJob.url,
+                description: wsJob.description || '',
+                platform: wsJob.platform || 'WebSearch',
+                postedDate: wsJob.postedDate ? new Date(wsJob.postedDate) : undefined,
+                source: 'WebSearch'
+              }));
+
+              jobs.push(...webSearchJobs);
+
+              logger.info(`✅ Loaded ${webSearchJobs.length} jobs from WebSearch data`);
+              logger.info(`📊 File timestamp: ${webSearchData.timestamp}`);
+              logger.info(`📈 Total opportunities in file: ${webSearchData.total_jobs_found || 'N/A'}`);
+            } else {
+              logger.warn('⚠️  WebSearch file has no jobs array');
+            }
+          } else {
+            logger.warn('⚠️  No WebSearch JSON files found in data/');
+            logger.info('💡 Run WebSearch manually via Claude Code to generate job data');
+          }
+        } else {
+          logger.warn('⚠️  data/ directory not found');
+          logger.info('💡 Create data/ directory and run WebSearch via Claude Code');
+        }
+      } catch (error) {
+        logger.error('❌ Error loading WebSearch data:', error);
+        logger.info('💡 Continuing with Tier 3 scraping...');
+      }
     } else {
       logger.info('✅ Tier 1 sufficient, skipping WebSearch');
     }
