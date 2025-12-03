@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import pLimit from 'p-limit';
 import { BaseScraper, PlatformConfig } from './base.js';
+import { AdzunaScraper, AdzunaConfig } from './adzuna.js';
 import { LinkedInScraper } from './linkedin.js';
 import { IndeedScraper } from './indeed.js';
 import { BaytScraper } from './bayt.js';
@@ -25,9 +26,11 @@ export async function loadPlatformConfigs(): Promise<PlatformConfig[]> {
 /**
  * Create scraper instance for a platform
  */
-export function createScraper(config: PlatformConfig): BaseScraper | null {
+export function createScraper(config: PlatformConfig): BaseScraper | AdzunaScraper | null {
   try {
     switch (config.id) {
+      case 'adzuna':
+        return new AdzunaScraper(config as AdzunaConfig);
       case 'linkedin':
         return new LinkedInScraper(config);
       case 'indeed':
@@ -61,7 +64,7 @@ export async function scanAllPlatforms(mode: 'quick' | 'deep' = 'quick'): Promis
   logger.info(`Found ${configs.length} enabled platforms`);
 
   // Create scrapers for all platforms
-  const scrapers: { scraper: BaseScraper; config: PlatformConfig }[] = [];
+  const scrapers: { scraper: BaseScraper | AdzunaScraper; config: PlatformConfig }[] = [];
 
   for (const config of configs) {
     const scraper = createScraper(config);
