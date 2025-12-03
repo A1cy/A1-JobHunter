@@ -248,6 +248,74 @@ export abstract class BaseScraper {
   }
 
   /**
+   * Build ScraperAPI proxy URL
+   */
+  protected buildProxyUrl(targetUrl: string): string {
+    const apiKey = process.env.SCRAPERAPI_KEY;
+    if (!apiKey) {
+      logger.warn('SCRAPERAPI_KEY not set, cannot use proxy');
+      return targetUrl;
+    }
+
+    // ScraperAPI format: http://api.scraperapi.com?api_key=KEY&url=TARGET_URL
+    const proxyUrl = `http://api.scraperapi.com/?api_key=${apiKey}&url=${encodeURIComponent(targetUrl)}&country_code=sa&render=false`;
+    return proxyUrl;
+  }
+
+  /**
+   * Scrape with ScraperAPI proxy (fallback when direct scraping blocked)
+   */
+  protected async scrapeWithProxy(url: string, extractFn: ($: cheerio.CheerioAPI) => Job[]): Promise<Job[]> {
+    const apiKey = process.env.SCRAPERAPI_KEY;
+    if (!apiKey) {
+      logger.error('SCRAPERAPI_KEY not set, cannot use proxy fallback');
+      return [];
+    }
+
+    try {
+      logger.info(`Using ScraperAPI proxy for ${url}`);
+
+      // Random delay before request
+      await this.sleep(500 + Math.floor(Math.random() * 1000));
+
+      const proxyUrl = this.buildProxyUrl(url);
+
+      const response = await pRetry(
+        async () => {
+          return await got(proxyUrl, {
+            headers: {
+              'User-Agent': getRandomUserAgent(),
+            },
+            timeout: { request: 30000 }, // Proxy takes longer
+            followRedirect: true,
+            retry: {
+              limit: 0 // Disable got's internal retry, we use pRetry instead
+            }
+          });
+        },
+        {
+          retries: 2, // Proxy is more reliable, fewer retries needed
+          minTimeout: 3000,
+          maxTimeout: 10000,
+          onFailedAttempt: (error: any) => {
+            logger.warn(`Proxy retry ${error.attemptNumber} for ${url}: ${error.message}`);
+          }
+        }
+      );
+
+      const $ = cheerio.load(response.body) as cheerio.CheerioAPI;
+      const jobs = extractFn($);
+
+      logger.info(`✅ Proxy successfully retrieved ${jobs.length} jobs from ${url}`);
+
+      return jobs;
+    } catch (error) {
+      logger.error(`Proxy scraping failed for ${url}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * Deduplicate jobs using cache
    */
   protected deduplicateJobs(jobs: Job[]): Job[] {
@@ -300,18 +368,33 @@ export abstract class BaseScraper {
           continue;
         }
 
-        // Apply rate limiting
+        // Apply rate limiting with 2-tier fallback: direct → proxy
         const jobs = await this.rateLimiter.schedule(async () => {
           if (this.config.requiresJS) {
+            // JS-heavy sites: use Playwright with stealth
             return await this.scrapeWithBrowser(url, async (page) => {
               const result = await this.extractJobs(page);
               return Array.isArray(result) ? result : [];
             });
           } else {
-            return await this.scrapeWithCheerio(url, (dom) => {
-              const result = this.extractJobs(dom);
-              return Array.isArray(result) ? result : [];
-            });
+            // Static sites: Try direct Cheerio first, fallback to proxy if blocked
+            try {
+              return await this.scrapeWithCheerio(url, (dom) => {
+                const result = this.extractJobs(dom);
+                return Array.isArray(result) ? result : [];
+              });
+            } catch (error: any) {
+              // If 403 Forbidden, try ScraperAPI proxy as fallback
+              if (error.response?.statusCode === 403 || error.code === 'ERR_NON_2XX_3XX_RESPONSE') {
+                logger.warn(`Direct scraping blocked (403), trying ScraperAPI proxy...`);
+                return await this.scrapeWithProxy(url, (dom) => {
+                  const result = this.extractJobs(dom);
+                  return Array.isArray(result) ? result : [];
+                });
+              }
+              // Re-throw other errors
+              throw error;
+            }
           }
         });
 
