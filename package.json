@@ -1,0 +1,47 @@
+{
+  "name": "a1-job-hunter",
+  "version": "1.0.0",
+  "description": "Automated daily job hunter for Riyadh tech positions using AI",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/job_hunter.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "dev": "tsx watch src/job_hunter.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "job-hunter",
+    "automation",
+    "ai",
+    "web-scraping",
+    "telegram-bot"
+  ],
+  "author": "A1",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "axios": "^1.7.0",
+    "bottleneck": "^2.19.5",
+    "cheerio": "^1.0.0",
+    "date-fns": "^3.0.0",
+    "dotenv": "^16.4.0",
+    "got": "^14.0.0",
+    "nanoid": "^5.0.0",
+    "p-limit": "^6.0.0",
+    "p-retry": "^6.0.0",
+    "playwright": "^1.54.0",
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "robots-parser": "^3.0.1",
+    "telegraf": "^4.16.0",
+    "user-agents": "^1.1.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0"
+  }
+}

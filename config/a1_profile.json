@@ -1,0 +1,41 @@
+{
+  "name": "A1",
+  "location": "Riyadh, Saudi Arabia",
+  "skills": {
+    "primary": [
+      "Digital Transformation",
+      "Artificial Intelligence",
+      "GenAI",
+      "Machine Learning",
+      "Full Stack Development"
+    ],
+    "technologies": [
+      "Python",
+      "JavaScript",
+      "TypeScript",
+      "React",
+      "Node.js",
+      "FastAPI",
+      "TensorFlow",
+      "PyTorch",
+      "LangChain",
+      "AWS",
+      "Docker",
+      "Kubernetes"
+    ]
+  },
+  "target_roles": [
+    "Digital Transformation Specialist",
+    "Digital Transformation Manager",
+    "Digital Transformation Officer",
+    "Digital Transformation Consultant",
+    "AI Engineer",
+    "ML Engineer",
+    "GenAI Developer",
+    "MLOps Engineer",
+    "Full Stack Developer",
+    "Software Engineer (Web)"
+  ],
+  "min_experience_match": 0.6,
+  "languages": ["English", "Arabic"]
+}

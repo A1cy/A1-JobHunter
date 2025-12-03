@@ -1,0 +1,57 @@
+name: A1 Job Hunter
+
+on:
+  schedule:
+    # Runs at 6:00 AM UTC daily (9:00 AM Saudi Arabia time)
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Manual trigger from GitHub UI or API
+    inputs:
+      mode:
+        description: 'Scan mode'
+        required: false
+        default: 'adaptive'
+        type: choice
+        options:
+          - quick
+          - deep
+          - adaptive
+  repository_dispatch:  # Trigger via API (for Claude Code integration)
+    types: [job-hunt-trigger]
+
+jobs:
+  job-hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Max 30 min per run
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chromium
+          npx puppeteer browsers install chrome
+
+      - name: Run job hunter
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODE: ${{ github.event.inputs.mode || github.event.client_payload.mode || 'adaptive' }}
+        run: |
+          npm start
+
+      - name: Upload results artifact (optional)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-results-${{ github.run_number }}
+          path: results/latest.json
+          retention-days: 7
