@@ -5,7 +5,13 @@ import { BaseScraper, PlatformConfig } from './base.js';
 import { LinkedInScraper } from './linkedin.js';
 import { IndeedScraper } from './indeed.js';
 import { BaytScraper } from './bayt.js';
+import { RSSJobScraper } from './rss-scraper.js';
+import { WebSearchJobScraper } from './websearch-scraper.js';
 import { Job, logger, deduplicateJobs } from '../utils.js';
+
+// Export new scrapers for external use
+export { RSSJobScraper } from './rss-scraper.js';
+export { WebSearchJobScraper } from './websearch-scraper.js';
 
 /**
  * Load platform configurations from JSON

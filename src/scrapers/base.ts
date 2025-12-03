@@ -243,7 +243,7 @@ export abstract class BaseScraper {
       return jobs;
     } catch (error) {
       logger.error(`Cheerio scraping failed for ${url}:`, error);
-      return [];
+      throw error;  // ✅ Re-throw to trigger proxy fallback in scan()
     }
   }
 

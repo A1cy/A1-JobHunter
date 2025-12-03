@@ -10,9 +10,11 @@ import { config } from 'dotenv';
 import { writeFile, mkdir } from 'fs/promises';
 import { resolve } from 'path';
 import { adaptiveScan, scanAllPlatforms } from './scrapers/index.js';
+import { RSSJobScraper } from './scrapers/rss-scraper.js';
+import { WebSearchJobScraper } from './scrapers/websearch-scraper.js';
 import { matchJobs } from './ai-matcher.js';
 import { sendToTelegram, sendErrorNotification } from './telegram.js';
-import { logger } from './utils.js';
+import { logger, deduplicateJobs, Job } from './utils.js';
 
 // Load environment variables
 config();
@@ -48,26 +50,101 @@ async function main() {
   logger.info(`Date: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })}`);
 
   try {
-    // Step 1: Scrape job platforms
-    logger.info('📡 Step 1: Scraping job platforms...');
+    // Step 1: Hybrid 3-Tier Job Scraping
+    logger.info('📡 Step 1: Hybrid job scraping (3-tier approach)...');
 
-    let jobs;
+    let jobs: Job[] = [];
     const mode = process.env.MODE || 'adaptive';
 
-    switch (mode) {
-      case 'quick':
-        jobs = await scanAllPlatforms('quick');
-        break;
-      case 'deep':
-        jobs = await scanAllPlatforms('deep');
-        break;
-      case 'adaptive':
-      default:
-        jobs = await adaptiveScan(10); // Target minimum 10 jobs
-        break;
+    // ═══════════════════════════════════════════════════════════
+    // TIER 1: RSS FEEDS (Fastest, most reliable, bot-friendly)
+    // ═══════════════════════════════════════════════════════════
+    logger.info('📡 Tier 1: RSS Feed Scraping...');
+
+    const rssScraper = new RSSJobScraper();
+    const rssKeywords = ['AI Engineer', 'ML Engineer', 'Machine Learning', 'Digital Transformation', 'Full Stack Developer'];
+
+    for (const keyword of rssKeywords) {
+      try {
+        const rssJobs = await rssScraper.scrapeRSS(keyword, 'Riyadh', 'indeed');
+        jobs.push(...rssJobs);
+        logger.info(`  ✓ RSS: "${keyword}" found ${rssJobs.length} jobs`);
+      } catch (error) {
+        logger.warn(`  ✗ RSS: "${keyword}" failed:`, error);
+      }
     }
 
-    logger.info(`✅ Found ${jobs.length} jobs from ${new Set(jobs.map(j => j.platform)).size} platforms`);
+    logger.info(`📊 Tier 1 Complete: ${jobs.length} jobs from RSS feeds`);
+
+    // ═══════════════════════════════════════════════════════════
+    // TIER 2: WEBSEARCH + AI (Unlimited, no rate limits)
+    // ═══════════════════════════════════════════════════════════
+    if (jobs.length < 5) {
+      logger.info('🔍 Tier 2: WebSearch + AI Parsing...');
+      logger.warn(`Only ${jobs.length} jobs from RSS, triggering WebSearch...`);
+
+      const webSearchScraper = new WebSearchJobScraper();
+      const webSearchKeywords = ['AI Engineer', 'Machine Learning', 'GenAI', 'Digital Transformation'];
+
+      const queries = webSearchScraper.buildSearchQueries(webSearchKeywords, 'Riyadh');
+
+      // Note: WebSearch integration requires Claude Code's WebSearch tool
+      // For now, log queries that would be executed
+      logger.info(`📝 Generated ${queries.length} WebSearch queries`);
+      logger.info('⚠️  WebSearch integration pending - requires Claude Code WebSearch tool during execution');
+      logger.info('💡 Skipping Tier 2 for now, moving to Tier 3...');
+
+      // TODO: Implement WebSearch tool integration when available
+      // Example usage (to be implemented):
+      // for (const query of queries.slice(0, 5)) {
+      //   const searchResults = await webSearch(query);
+      //   const searchJobs = webSearchScraper.parseSearchResults(searchResults, query, 'Riyadh');
+      //   jobs.push(...searchJobs);
+      // }
+    } else {
+      logger.info('✅ Tier 1 sufficient, skipping WebSearch');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TIER 3: DIRECT/PROXY SCRAPING (Existing infrastructure)
+    // ═══════════════════════════════════════════════════════════
+    if (jobs.length < 10) {
+      logger.info('🌐 Tier 3: Direct Scraping with Proxy Fallback...');
+      logger.warn(`Only ${jobs.length} jobs so far, triggering direct/proxy scraping...`);
+
+      let tier3Jobs: Job[];
+
+      switch (mode) {
+        case 'quick':
+          tier3Jobs = await scanAllPlatforms('quick');
+          break;
+        case 'deep':
+          tier3Jobs = await scanAllPlatforms('deep');
+          break;
+        case 'adaptive':
+        default:
+          const targetRemaining = Math.max(10 - jobs.length, 5); // At least 5 more jobs
+          tier3Jobs = await adaptiveScan(targetRemaining);
+          break;
+      }
+
+      logger.info(`📊 Tier 3 found ${tier3Jobs.length} additional jobs`);
+      jobs.push(...tier3Jobs);
+    } else {
+      logger.info('✅ Tiers 1+2 sufficient, skipping direct scraping');
+    }
+
+    // Deduplicate across all tiers
+    const uniqueJobs = deduplicateJobs(jobs);
+
+    logger.info(`\n═══════════════════════════════════════════════════════════`);
+    logger.info(`✅ Hybrid Scraping Complete:`);
+    logger.info(`   Total scraped: ${jobs.length} jobs`);
+    logger.info(`   After deduplication: ${uniqueJobs.length} unique jobs`);
+    logger.info(`   Platforms: ${[...new Set(uniqueJobs.map(j => j.platform))].join(', ')}`);
+    logger.info(`═══════════════════════════════════════════════════════════\n`);
+
+    jobs = uniqueJobs;
 
     if (jobs.length === 0) {
       logger.warn('⚠️ No jobs found. Notifying user with error details...');
