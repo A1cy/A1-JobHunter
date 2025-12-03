@@ -1,24 +1,28 @@
 # 🎯 A1 Job Hunter
 
-**Automated daily job hunting system powered by AI**
+**100% FREE Automated Job Hunting System**
 
-Find tech jobs in Riyadh, Saudi Arabia automatically every day at 9:00 AM with AI-powered matching and Telegram delivery.
+Find tech jobs in Riyadh, Saudi Arabia automatically every day at 9:00 AM with smart keyword matching and Telegram delivery.
 
 [![GitHub Actions](https://github.com/A1cy/A1-JobHunter/workflows/A1%20Job%20Hunter/badge.svg)](https://github.com/A1cy/A1-JobHunter/actions)
+[![100% FREE](https://img.shields.io/badge/Cost-$0%2Fmonth-brightgreen)](https://github.com/A1cy/A1-JobHunter)
+[![No API Keys](https://img.shields.io/badge/API%20Keys-None%20Required-blue)](https://github.com/A1cy/A1-JobHunter)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
 
+- 💯 **100% FREE Forever**: No API costs, no credit cards, no limits!
+- 🎯 **Smart Keyword Matching**: Rule-based scoring (0-100%) matching your skills and roles
 - 🤖 **Fully Automated**: Runs daily at 9:00 AM Riyadh time on GitHub Actions
-- 🧠 **AI-Powered Matching**: Uses Claude AI (Anthropic) to score job relevance (0-100)
-- 🚀 **Multi-Platform Scraping**: LinkedIn, Indeed Saudi, Bayt, and more
+- 🚀 **WebSearch Integration**: Google-powered job discovery bypassing all bot detection
 - 📱 **Telegram Delivery**: Beautiful formatted messages sent directly to your phone
-- ⚡ **Adaptive Scanning**: Quick scan first, deep scan if needed (<10 jobs)
+- ⚡ **3-Tier Hybrid System**: RSS feeds → WebSearch → Direct scraping with intelligent failover
 - 🛡️ **Anti-Detection**: Stealth mode, user agent rotation, rate limiting
 - 🔄 **Smart Deduplication**: Removes duplicate job postings across platforms
-- 📊 **Detailed Matching**: Shows why each job matches your profile
+- 📊 **Detailed Matching**: Shows why each job matches your profile with match reasons
 - 🌐 **100% Cloud-Based**: No local PC required, runs forever on GitHub Actions
+- 🔒 **Privacy-First**: All matching done locally, no data sent to external APIs
 
 ## 🎯 Target Roles
 

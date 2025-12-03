@@ -13,7 +13,7 @@ import { existsSync } from 'fs';
 import { adaptiveScan, scanAllPlatforms } from './scrapers/index.js';
 import { RSSJobScraper } from './scrapers/rss-scraper.js';
 import { WebSearchJobScraper } from './scrapers/websearch-scraper.js';
-import { matchJobs } from './ai-matcher.js';
+import { matchJobs } from './keyword-matcher.js';
 import { sendToTelegram, sendErrorNotification } from './telegram.js';
 import { logger, deduplicateJobs, Job } from './utils.js';
 
@@ -193,8 +193,8 @@ async function main() {
       return;
     }
 
-    // Step 2: AI matching and scoring
-    logger.info('🧠 Step 2: AI matching with Claude...');
+    // Step 2: FREE keyword matching
+    logger.info('🔍 Step 2: FREE keyword-based matching...');
 
     const matchedJobs = await matchJobs(jobs);
 
