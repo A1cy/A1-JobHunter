@@ -17,6 +17,16 @@ interface UserProfile {
 export class KeywordJobMatcher {
   private profile: UserProfile;
 
+  // Abbreviation map for matching common job description abbreviations
+  private abbreviationMap: Map<string, string[]> = new Map([
+    ['ml', ['machine learning']],
+    ['ai', ['artificial intelligence']],
+    ['dt', ['digital transformation']],
+    ['genai', ['generative ai', 'generative artificial intelligence']],
+    ['mlops', ['machine learning operations', 'ml operations']],
+    ['api', ['application programming interface']],
+  ]);
+
   constructor(profile: UserProfile) {
     this.profile = profile;
   }
@@ -62,23 +72,46 @@ export class KeywordJobMatcher {
   }
 
   /**
+   * Expand text with abbreviation equivalents for matching
+   * Example: "ML models" → "ML models machine learning models"
+   */
+  private expandWithAbbreviations(text: string): string {
+    let expanded = text.toLowerCase();
+
+    for (const [abbr, expansions] of this.abbreviationMap) {
+      // Match word boundaries to avoid partial matches
+      const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+      if (regex.test(text)) {
+        // Append expansions to text for matching
+        expanded += ' ' + expansions.join(' ');
+      }
+    }
+
+    return expanded;
+  }
+
+  /**
    * Score job title match (0-40 points)
    */
   private scoreTitleMatch(title: string): { score: number; matchedRole: string | null } {
-    const lowerTitle = title.toLowerCase();
+    // Expand both title and roles for matching (handles ML ↔ Machine Learning, etc.)
+    const expandedTitle = this.expandWithAbbreviations(title);
     let bestScore = 0;
     let bestRole = null;
 
     for (const role of this.profile.target_roles) {
-      const roleWords = role.toLowerCase().split(' ');
-      const titleWords = lowerTitle.split(' ');
+      const expandedRole = this.expandWithAbbreviations(role);
+      const roleWords = expandedRole.split(' ').filter(w => w.length > 0);
+      const titleWords = expandedTitle.split(' ').filter(w => w.length > 0);
 
       // Count matching words
       const matchingWords = roleWords.filter(word =>
         titleWords.some(titleWord => titleWord.includes(word) || word.includes(titleWord))
       );
 
-      const matchRatio = matchingWords.length / roleWords.length;
+      // Use original role length for ratio calculation (not expanded)
+      const originalRoleLength = role.split(' ').length;
+      const matchRatio = matchingWords.length / originalRoleLength;
 
       // Exact match: 40 points, Partial: 20-35 points
       const score = matchRatio === 1.0 ? 40 : Math.floor(matchRatio * 35);
@@ -96,9 +129,11 @@ export class KeywordJobMatcher {
    * Find primary skills in job description
    */
   private findSkills(description: string): string[] {
-    const lowerDesc = description.toLowerCase();
+    // Expand abbreviations in description before matching (ML → machine learning)
+    const expandedDesc = this.expandWithAbbreviations(description);
+
     return this.profile.skills.primary.filter(skill =>
-      lowerDesc.includes(skill.toLowerCase())
+      expandedDesc.includes(skill.toLowerCase())
     );
   }
 
@@ -106,9 +141,11 @@ export class KeywordJobMatcher {
    * Find technologies in job description
    */
   private findTechnologies(description: string): string[] {
-    const lowerDesc = description.toLowerCase();
+    // Expand abbreviations in description before matching (API → application programming interface)
+    const expandedDesc = this.expandWithAbbreviations(description);
+
     return this.profile.skills.technologies.filter(tech =>
-      lowerDesc.includes(tech.toLowerCase())
+      expandedDesc.includes(tech.toLowerCase())
     );
   }
 
@@ -166,7 +203,8 @@ export async function matchJobs(jobs: Job[]): Promise<Job[]> {
   const matcher = new KeywordJobMatcher(profile);
 
   const scoredJobs = matcher.scoreJobs(jobs);
-  const minScore = (profile.min_experience_match || 0.6) * 100;
+  // Lower threshold to 55 to account for abbreviation-heavy job descriptions
+  const minScore = 55;
   const filteredJobs = matcher.filterByScore(scoredJobs, minScore);
 
   logger.info(`✅ Keyword matching complete: ${filteredJobs.length}/${jobs.length} jobs passed threshold (≥${minScore}%)`);
