@@ -10,12 +10,14 @@ import { config } from 'dotenv';
 import { writeFile, mkdir, readFile, readdir } from 'fs/promises';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
+import { Telegraf } from 'telegraf';
 import { JoobleJobScraper } from './scrapers/jooble-scraper.js';
 import { JSearchJobScraper } from './scrapers/jsearch-scraper.js';
 import { SearchAPIJobScraper } from './scrapers/searchapi-scraper.js';
 import { matchJobsForAllUsers } from './multi-user-matcher.js';
-import { sendToAllUsers, sendErrorNotificationToAllUsers } from './multi-user-telegram.js';
+import { sendToAllUsers, sendErrorNotificationToAllUsers, setupCallbackHandlers } from './multi-user-telegram.js';
 import { logger, deduplicateJobs, Job, generateJobId } from './utils.js';
+import { createMonitor } from './monitoring.js';
 
 // Load environment variables
 config();
@@ -45,6 +47,23 @@ async function saveResults(jobs: any[]): Promise<void> {
  */
 async function main() {
   const startTime = Date.now();
+  const monitor = createMonitor();
+
+  // Initialize Telegram bot with callback handlers
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (botToken) {
+    const bot = new Telegraf(botToken);
+    setupCallbackHandlers(bot);
+    bot.launch().then(() => {
+      logger.info('✅ Telegram bot initialized with callback handlers');
+    }).catch((error) => {
+      logger.warn('⚠️  Failed to launch Telegram bot:', error);
+    });
+
+    // Graceful shutdown
+    process.once('SIGINT', () => bot.stop('SIGINT'));
+    process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  }
 
   logger.info('🚀 A1 Job Hunter starting...');
   logger.info(`Mode: ${process.env.MODE || 'adaptive'}`);
@@ -202,6 +221,16 @@ async function main() {
 
     jobs = uniqueJobs;
 
+    // Record scraping metrics
+    const jobsBySource: Record<string, number> = {};
+    for (const job of jobs) {
+      jobsBySource[job.platform] = (jobsBySource[job.platform] || 0) + 1;
+    }
+    monitor.recordMetrics({
+      totalJobs: jobs.length,
+      jobsBySource
+    });
+
     if (jobs.length === 0) {
       logger.warn('⚠️ No jobs found from any source');
       logger.info('💡 All users will be notified that no jobs were found today');
@@ -234,6 +263,13 @@ async function main() {
     });
     logger.info(`═══════════════════════════════════════════════════════════\n`);
 
+    // Record matching metrics
+    const totalDelivered = userResults.reduce((sum, r) => sum + r.matched_jobs.length, 0);
+    monitor.recordMetrics({
+      usersProcessed: userResults.length,
+      jobsDelivered: totalDelivered
+    });
+
     // Step 3: Save results for all users
     logger.info('💾 Step 3: Saving results...');
 
@@ -252,6 +288,9 @@ async function main() {
     logger.info(`✅ Job hunt complete for all users!`);
     logger.info(`⏱️ Total time: ${duration}s`);
 
+    // Record runtime
+    monitor.recordMetrics({ runtime: Date.now() - startTime });
+
     // Summary stats
     logger.info('\n📊 Summary:');
     logger.info(`   Users processed: ${userResults.length}`);
@@ -263,8 +302,27 @@ async function main() {
     logger.info(`   Platforms: ${[...new Set(jobs.map(j => j.platform))].join(', ')}`);
     logger.info(`   Duration: ${duration}s`);
 
+    // Perform health checks
+    await monitor.performHealthCheck();
+
+    // Send summary to admin
+    await monitor.sendSummary();
+
   } catch (error) {
     logger.error('❌ Job hunt failed:', error);
+
+    // Record error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    monitor.recordMetrics({
+      errors: [errorMessage],
+      runtime: Date.now() - startTime
+    });
+
+    // Send critical alert to admin
+    await monitor.sendAlert(
+      `System failure: ${errorMessage}`,
+      'critical'
+    );
 
     // Send error notification to all users
     if (error instanceof Error) {

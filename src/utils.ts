@@ -14,6 +14,9 @@ export interface Job {
   platform: string;
   score?: number;
   matchReasons?: string[];
+  semanticScore?: number;  // Phase 2: BERT-based semantic similarity (0-15 points)
+  tfidfScore?: number;      // Phase 2: TF-IDF keyword importance (0-10 points)
+  source?: string;          // Job source (API, WebSearch, etc.)
 }
 
 /**

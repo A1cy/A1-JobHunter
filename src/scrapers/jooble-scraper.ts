@@ -1,4 +1,5 @@
 import got from 'got';
+import pRetry from 'p-retry';
 import { Job, generateJobId, logger } from '../utils.js';
 
 interface JoobleJob {
@@ -47,37 +48,58 @@ export class JoobleJobScraper {
       return [];
     }
 
-    try {
-      const url = `https://jooble.org/api/${this.apiKey}`;
-      const body = { keywords, location, page };
+    // Wrap API call with retry logic
+    return await pRetry(
+      async () => {
+        try {
+          const url = `https://jooble.org/api/${this.apiKey}`;
+          const body = { keywords, location, page };
 
-      logger.debug(`Jooble API request: ${keywords}, ${location}, page ${page}`);
+          logger.debug(`Jooble API request: ${keywords}, ${location}, page ${page}`);
 
-      const response = await got.post(url, {
-        json: body,
-        responseType: 'json',
-        timeout: { request: 10000 }
-      });
+          const response = await got.post(url, {
+            json: body,
+            responseType: 'json',
+            timeout: { request: 10000 }
+          });
 
-      const data = response.body as JoobleResponse;
+          const data = response.body as JoobleResponse;
 
-      logger.info(`✅ Jooble: "${keywords}" → ${data.jobs?.length || 0} jobs`);
+          logger.info(`✅ Jooble: "${keywords}" → ${data.jobs?.length || 0} jobs`);
 
-      return (data.jobs || []).map(job => ({
-        id: generateJobId(),
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        url: job.link,
-        description: job.snippet || '',
-        postedDate: job.updated ? new Date(job.updated) : undefined,
-        platform: 'Jooble',
-        source: 'API'
-      }));
-    } catch (error) {
-      logger.error(`❌ Jooble error for "${keywords}":`, error);
-      return [];
-    }
+          return (data.jobs || []).map(job => ({
+            id: generateJobId(),
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            url: job.link,
+            description: job.snippet || '',
+            postedDate: job.updated ? new Date(job.updated) : undefined,
+            platform: 'Jooble',
+            source: 'API'
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.warn(`⚠️  Jooble API error (will retry): ${message}`);
+          throw error; // pRetry will catch and retry
+        }
+      },
+      {
+        retries: 3, // 3 retries = 4 total attempts
+        factor: 2, // Exponential backoff: 1s, 2s, 4s
+        minTimeout: 1000, // Start with 1 second
+        maxTimeout: 10000, // Max 10 seconds between retries
+        onFailedAttempt: (error) => {
+          logger.warn(
+            `⚠️  Jooble retry ${error.attemptNumber}/${error.retriesLeft + error.attemptNumber} ` +
+            `failed: ${error.message}`
+          );
+        }
+      }
+    ).catch(error => {
+      logger.error(`❌ Jooble failed after all retries for "${keywords}":`, error);
+      return []; // Return empty array on final failure
+    });
   }
 
   /**

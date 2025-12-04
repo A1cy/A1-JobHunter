@@ -3,6 +3,8 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import { Job, logger } from './utils.js';
 import { KeywordJobMatcher } from './keyword-matcher.js';
+import { SemanticJobMatcher } from './semantic-matcher.js';
+import { TFIDFScorer, extractProfileKeywords } from './tfidf-scorer.js';
 
 /**
  * User profile interface (matches format in users/[username]/profile.json)
@@ -158,7 +160,7 @@ function calculateStats(matchedJobs: Job[], totalJobs: number) {
 }
 
 /**
- * Match jobs for all enabled users
+ * Match jobs for all enabled users (with semantic + TF-IDF enhancements)
  */
 export async function matchJobsForAllUsers(allJobs: Job[]): Promise<UserMatchResult[]> {
   logger.info(`🔍 Loading users for multi-user matching...`);
@@ -177,13 +179,31 @@ export async function matchJobsForAllUsers(allJobs: Job[]): Promise<UserMatchRes
   for (const user of users) {
     logger.info(`\n📊 Matching jobs for ${user.username} (${user.profile.name})...`);
 
-    // Create matcher with user's profile
+    // Phase 1: Build TF-IDF corpus (one-time per user)
+    const tfidfScorer = new TFIDFScorer();
+    tfidfScorer.buildCorpus(allJobs);
+
+    // Phase 2: Initialize semantic matcher (one-time per user)
+    const semanticMatcher = new SemanticJobMatcher();
+    const profileText = SemanticJobMatcher.buildProfileText(user.profile);
+    await semanticMatcher.initialize(profileText);
+
+    // Phase 3: Score jobs with TF-IDF weighting
+    const profileKeywords = extractProfileKeywords(user.profile);
+    let enhancedJobs = tfidfScorer.scoreJobs(allJobs, profileKeywords);
+
+    // Phase 4: Add semantic similarity scores
+    if (semanticMatcher.isReady()) {
+      enhancedJobs = await semanticMatcher.scoreJobs(enhancedJobs);
+    } else {
+      logger.warn(`⚠️  Semantic matching disabled for ${user.username}`);
+    }
+
+    // Phase 5: Keyword matching (now includes semantic + TF-IDF bonuses)
     const matcher = new KeywordJobMatcher(user.profile);
+    const scoredJobs = matcher.scoreJobs(enhancedJobs);
 
-    // Score all jobs
-    const scoredJobs = matcher.scoreJobs(allJobs);
-
-    // Filter by user's threshold and limits
+    // Phase 6: Filter by user's threshold and limits
     const matchedJobs = filterByUserThreshold(
       scoredJobs,
       user.config.matching_threshold,

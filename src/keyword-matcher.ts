@@ -19,12 +19,53 @@ export class KeywordJobMatcher {
 
   // Abbreviation map for matching common job description abbreviations
   private abbreviationMap: Map<string, string[]> = new Map([
+    // Existing abbreviations
     ['ml', ['machine learning']],
     ['ai', ['artificial intelligence']],
     ['dt', ['digital transformation']],
     ['genai', ['generative ai', 'generative artificial intelligence']],
     ['mlops', ['machine learning operations', 'ml operations']],
     ['api', ['application programming interface']],
+
+    // NEW: Development & Engineering
+    ['fe', ['frontend', 'front-end', 'front end']],
+    ['be', ['backend', 'back-end', 'back end']],
+    ['fullstack', ['full stack', 'full-stack']],
+    ['devops', ['development operations', 'dev ops']],
+    ['qa', ['quality assurance', 'quality analyst']],
+    ['sre', ['site reliability engineer', 'site reliability engineering']],
+    ['ci/cd', ['continuous integration', 'continuous deployment', 'continuous delivery']],
+    ['cicd', ['continuous integration', 'continuous deployment', 'continuous delivery']],
+
+    // NEW: Technologies & Frameworks
+    ['js', ['javascript']],
+    ['ts', ['typescript']],
+    ['py', ['python']],
+    ['k8s', ['kubernetes']],
+    ['aws', ['amazon web services']],
+    ['gcp', ['google cloud platform']],
+    ['db', ['database']],
+    ['nosql', ['non-relational database']],
+    ['rest', ['restful api', 'rest api']],
+    ['graphql', ['graph query language']],
+
+    // NEW: HR & Business (for Hamad)
+    ['hr', ['human resources']],
+    ['hris', ['human resource information system']],
+    ['od', ['organization development', 'organizational development']],
+    ['l&d', ['learning and development', 'learning & development']],
+    ['c&b', ['compensation and benefits', 'compensation & benefits']],
+
+    // NEW: Product & Marketing (for Saud)
+    ['pm', ['product manager', 'product management', 'project manager']],
+    ['seo', ['search engine optimization']],
+    ['ppc', ['pay per click', 'pay-per-click']],
+    ['roi', ['return on investment']],
+    ['kpi', ['key performance indicator', 'key performance indicators']],
+    ['gtm', ['go to market', 'go-to-market']],
+    ['b2b', ['business to business', 'business-to-business']],
+    ['b2c', ['business to consumer', 'business-to-consumer']],
+    ['saas', ['software as a service']],
   ]);
 
   constructor(profile: UserProfile) {
@@ -32,7 +73,13 @@ export class KeywordJobMatcher {
   }
 
   /**
-   * Score a job based on keyword matching (0-100)
+   * Score a job based on keyword matching + semantic similarity + TF-IDF (0-100)
+   *
+   * Scoring breakdown:
+   * - Keyword matching: 0-100 points (title, skills, tech, location)
+   * - Semantic similarity: 0-15 bonus points (BERT-based)
+   * - TF-IDF weighting: 0-10 bonus points (keyword importance)
+   * Total: 0-125 points (capped at 100)
    */
   scoreJob(job: Job): { score: number; matchReasons: string[] } {
     let score = 0;
@@ -66,6 +113,18 @@ export class KeywordJobMatcher {
     score += locationScore;
     if (locationScore > 0) {
       reasons.push('Based in Riyadh, Saudi Arabia');
+    }
+
+    // 5. Semantic Similarity Bonus (0-15 points) - added by semantic matcher
+    if (job.semanticScore && job.semanticScore > 0) {
+      score += job.semanticScore;
+      reasons.push(`Strong semantic match (+${job.semanticScore} pts)`);
+    }
+
+    // 6. TF-IDF Bonus (0-10 points) - added by TF-IDF scorer
+    if (job.tfidfScore && job.tfidfScore > 0) {
+      score += job.tfidfScore;
+      reasons.push(`Rare, important keywords (+${job.tfidfScore} pts)`);
     }
 
     return { score: Math.min(score, 100), matchReasons: reasons };

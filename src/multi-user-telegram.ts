@@ -1,6 +1,8 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { Job, logger } from './utils.js';
 import { UserMatchResult } from './multi-user-matcher.js';
+import { JobCache } from './job-cache.js';
+import { ApplicationTracker } from './application-tracker.js';
 
 /**
  * Sleep utility for rate limiting
@@ -10,37 +12,30 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Split jobs into messages (max 4096 chars per Telegram message)
+ * Format a single job message with inline action buttons
  */
-function splitIntoMessages(jobs: Job[]): string[] {
-  const messages: string[] = [];
-  let currentMessage = '';
-  const MAX_LENGTH = 4000; // Leave some buffer
+function formatJobMessage(job: Job): { text: string; keyboard: any } {
+  const scoreEmoji = (job.score || 0) >= 85 ? '🌟' : (job.score || 0) >= 70 ? '⭐' : '✅';
 
-  for (const job of jobs) {
-    const scoreEmoji = (job.score || 0) >= 85 ? '🌟' : (job.score || 0) >= 70 ? '⭐' : '✅';
+  const text = `${scoreEmoji} *${job.title}* (${job.score || 0}%)\n` +
+    `🏢 ${job.company}\n` +
+    `📍 ${job.location}\n` +
+    (job.matchReasons && job.matchReasons.length > 0
+      ? `💡 ${job.matchReasons.slice(0, 2).join(' • ')}\n`
+      : '');
 
-    const jobText = `\n${scoreEmoji} *${job.title}* (${job.score || 0}%)\n` +
-      `🏢 ${job.company}\n` +
-      `📍 ${job.location}\n` +
-      `🔗 [Apply Here](${job.url})\n` +
-      (job.matchReasons && job.matchReasons.length > 0
-        ? `💡 ${job.matchReasons.join(' • ')}\n`
-        : '');
+  // Inline buttons for tracking and applying
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.url('🔗 Apply Now', job.url)
+    ],
+    [
+      Markup.button.callback('✅ Applied', `applied_${job.id}`),
+      Markup.button.callback('❌ Pass', `pass_${job.id}`)
+    ]
+  ]);
 
-    if (currentMessage.length + jobText.length > MAX_LENGTH) {
-      messages.push(currentMessage);
-      currentMessage = jobText;
-    } else {
-      currentMessage += jobText;
-    }
-  }
-
-  if (currentMessage) {
-    messages.push(currentMessage);
-  }
-
-  return messages;
+  return { text, keyboard };
 }
 
 /**
@@ -77,19 +72,18 @@ async function sendPersonalizedJobs(
     // Small delay after header
     await sleep(500);
 
-    // Send job listings
+    // Send each job with action buttons
     if (result.matched_jobs.length > 0) {
-      const jobMessages = splitIntoMessages(result.matched_jobs);
+      for (const job of result.matched_jobs) {
+        const { text, keyboard } = formatJobMessage(job);
 
-      for (let i = 0; i < jobMessages.length; i++) {
-        await bot.telegram.sendMessage(chatId, jobMessages[i], {
-          parse_mode: 'Markdown'
+        await bot.telegram.sendMessage(chatId, text, {
+          parse_mode: 'Markdown',
+          ...keyboard
         });
 
-        // Rate limit between messages
-        if (i < jobMessages.length - 1) {
-          await sleep(1000);
-        }
+        // Rate limit between messages (500ms)
+        await sleep(500);
       }
     }
 
@@ -115,6 +109,10 @@ async function sendPersonalizedJobs(
  * Send jobs to all users with personalized matching
  */
 export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> {
+  // Load job cache to filter duplicates
+  const cache = new JobCache();
+  await cache.load();
+
   // Handle case where no jobs were found at all (empty array passed)
   if (results.length === 0) {
     logger.warn('⚠️  No jobs to send - notifying all users');
@@ -169,7 +167,49 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
 
   for (const result of results) {
     try {
-      await sendPersonalizedJobs(result, bot);
+      // Filter out jobs shown to this user in last 3 days
+      const freshJobs = cache.filterRecentlyShown(
+        result.matched_jobs,
+        result.username,
+        3 // Don't show same job within 3 days
+      );
+
+      const stats = cache.getFilterStats(result.matched_jobs, result.username, 3);
+      logger.info(
+        `📊 ${result.username}: ${stats.total} matched → ` +
+        `${stats.fresh} fresh (filtered ${stats.duplicates} duplicates)`
+      );
+
+      if (freshJobs.length > 0) {
+        // Send fresh jobs to user
+        await sendPersonalizedJobs(
+          { ...result, matched_jobs: freshJobs },
+          bot
+        );
+
+        // Mark jobs as shown
+        for (const job of freshJobs) {
+          cache.markAsShown(job, result.username);
+        }
+      } else {
+        // Send "no new jobs" message
+        const noNewJobsMessage = `🔍 *Job Hunter - ${result.profile.name}*\n` +
+          `${new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'Asia/Riyadh'
+          })}\n\n` +
+          `No new jobs today (${stats.total} jobs matched but already shown recently).\n\n` +
+          `We'll keep searching! 🎯`;
+
+        await bot.telegram.sendMessage(
+          result.config.telegram_chat_id,
+          noNewJobsMessage,
+          { parse_mode: 'Markdown' }
+        );
+        logger.info(`ℹ️  No fresh jobs for ${result.username} (all ${stats.total} were duplicates)`);
+      }
 
       // Rate limit between users (1 second)
       if (results.indexOf(result) < results.length - 1) {
@@ -181,7 +221,71 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
     }
   }
 
+  // Clean up old cache entries and save
+  cache.cleanup();
+  await cache.save();
+
   logger.info(`✅ Telegram delivery complete for all users`);
+}
+
+/**
+ * Setup callback handlers for inline button actions (Applied / Pass)
+ */
+export function setupCallbackHandlers(bot: Telegraf): void {
+  const tracker = new ApplicationTracker();
+
+  // Handle "Applied" button
+  bot.action(/applied_(.+)/, async (ctx) => {
+    const jobId = ctx.match[1];
+    const userId = ctx.from.id.toString();
+
+    try {
+      // Track application
+      await tracker.trackAction(userId, jobId, 'applied');
+
+      // Acknowledge and update message
+      await ctx.answerCbQuery('✅ Marked as Applied');
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: [
+          [{ text: '✅ Applied', callback_data: 'applied_done' }]
+        ]
+      });
+
+      logger.info(`✅ User ${userId} applied to job ${jobId}`);
+    } catch (error) {
+      logger.error(`Failed to track application:`, error);
+      await ctx.answerCbQuery('❌ Error tracking application');
+    }
+  });
+
+  // Handle "Pass" button
+  bot.action(/pass_(.+)/, async (ctx) => {
+    const jobId = ctx.match[1];
+    const userId = ctx.from.id.toString();
+
+    try {
+      // Track pass action
+      await tracker.trackAction(userId, jobId, 'passed');
+
+      // Acknowledge and update message
+      await ctx.answerCbQuery('❌ Marked as Not Interested');
+      await ctx.editMessageReplyMarkup({
+        inline_keyboard: [
+          [{ text: '❌ Passed', callback_data: 'pass_done' }]
+        ]
+      });
+
+      logger.info(`❌ User ${userId} passed on job ${jobId}`);
+    } catch (error) {
+      logger.error(`Failed to track pass:`, error);
+      await ctx.answerCbQuery('❌ Error tracking action');
+    }
+  });
+
+  // Handle already actioned buttons (prevent re-clicking)
+  bot.action(['applied_done', 'pass_done'], async (ctx) => {
+    await ctx.answerCbQuery('Already tracked!');
+  });
 }
 
 /**
