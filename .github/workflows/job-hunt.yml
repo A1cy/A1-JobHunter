@@ -27,6 +27,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Restore job cache from previous runs to prevent duplicate job notifications
+      - name: Restore job cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/
+          key: job-cache-${{ github.run_id }}
+          restore-keys: |
+            job-cache-
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -52,6 +61,14 @@ jobs:
           MODE: ${{ github.event.inputs.mode || github.event.client_payload.mode || 'adaptive' }}
         run: |
           npm start
+
+      # Save job cache for future runs to prevent duplicate job notifications
+      - name: Save job cache
+        uses: actions/cache/save@v4
+        if: always()  # Save cache even if workflow fails
+        with:
+          path: .cache/
+          key: job-cache-${{ github.run_id }}
 
       - name: Upload results artifact (optional)
         if: success()

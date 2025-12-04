@@ -79,10 +79,67 @@ export class KeywordJobMatcher {
     const titleLower = jobTitle.toLowerCase();
     const targetRolesStr = this.profile.target_roles.join(' ').toLowerCase();
 
-    // Define domain-specific keywords
-    const itKeywords = ['software', 'developer', 'programming', 'ai engineer', 'ml engineer',
-                        'data scientist', 'devops', 'full stack', 'frontend', 'backend',
-                        'digital transformation', 'machine learning', 'artificial intelligence'];
+    // Define domain-specific keywords (COMPREHENSIVE LIST - FIX FOR CROSS-DOMAIN FILTERING)
+    const itKeywords = [
+      // Original keywords
+      'software', 'developer', 'programming', 'ai engineer', 'ml engineer',
+      'data scientist', 'devops', 'full stack', 'frontend', 'backend',
+      'digital transformation', 'machine learning', 'artificial intelligence',
+
+      // Web development (ALL VARIANTS)
+      'web developer', 'web engineer', 'web dev', 'web application', 'webdev',
+      'website developer', 'web programmer',
+
+      // Backend development (ALL VARIANTS)
+      'backend developer', 'backend engineer', 'back end', 'back-end',
+      'backend programmer', 'server side developer',
+
+      // Frontend development (ALL VARIANTS)
+      'frontend developer', 'frontend engineer', 'front end', 'front-end',
+      'ui developer', 'frontend programmer',
+
+      // Full stack (ALL VARIANTS)
+      'full stack developer', 'fullstack', 'full-stack', 'full stack engineer',
+      'full-stack engineer', 'fullstack developer',
+
+      // API and cloud
+      'api developer', 'api engineer', 'rest api', 'graphql', 'api designer',
+      'cloud engineer', 'cloud architect', 'cloud developer',
+      'aws', 'azure', 'gcp', 'cloud infrastructure', 'cloud specialist',
+
+      // Database and infrastructure
+      'database administrator', 'database engineer', 'dba', 'sql developer',
+      'database developer', 'database specialist',
+      'infrastructure engineer', 'systems engineer', 'network engineer',
+      'system administrator', 'devops engineer',
+
+      // Mobile development
+      'mobile developer', 'android developer', 'ios developer',
+      'mobile engineer', 'app developer', 'mobile app',
+      'react native', 'flutter developer', 'swift developer', 'kotlin developer',
+
+      // QA and testing
+      'qa engineer', 'quality assurance', 'test engineer', 'automation engineer',
+      'software tester', 'qa analyst', 'testing engineer',
+
+      // Security
+      'security engineer', 'cybersecurity', 'penetration tester',
+      'security analyst', 'infosec', 'appsec',
+
+      // Blockchain and emerging tech
+      'blockchain developer', 'smart contract', 'web3 developer',
+      'cryptocurrency', 'solidity developer',
+
+      // Generic IT roles
+      'software engineer', 'coding', 'programmer', 'coder',
+      'tech lead', 'engineering manager', 'technical lead',
+      'it specialist', 'it engineer', 'technology',
+
+      // Platform and operations
+      'platform engineer', 'sre', 'site reliability', 'operations engineer',
+      'kubernetes', 'docker', 'containerization'
+    ];
+
     const hrKeywords = ['hr specialist', 'hr generalist', 'hr officer', 'recruitment',
                        'payroll', 'hris', 'employee relations', 'hr business partner'];
 
