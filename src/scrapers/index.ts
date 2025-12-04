@@ -5,13 +5,14 @@ import { BaseScraper, PlatformConfig } from './base.js';
 import { LinkedInScraper } from './linkedin.js';
 import { IndeedScraper } from './indeed.js';
 import { BaytScraper } from './bayt.js';
-import { RSSJobScraper } from './rss-scraper.js';
-import { WebSearchJobScraper } from './websearch-scraper.js';
 import { Job, logger, deduplicateJobs } from '../utils.js';
 
 // Export new scrapers for external use
 export { RSSJobScraper } from './rss-scraper.js';
 export { WebSearchJobScraper } from './websearch-scraper.js';
+export { JoobleJobScraper } from './jooble-scraper.js';
+export { JSearchJobScraper } from './jsearch-scraper.js';
+export { SearchAPIJobScraper } from './searchapi-scraper.js';
 
 /**
  * Load platform configurations from JSON

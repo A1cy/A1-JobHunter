@@ -47,7 +47,7 @@ export class RSSJobScraper {
       const $ = cheerio.load(response.body, { xmlMode: true });
 
       // Extract job items from RSS feed
-      $('item').each((i, elem) => {
+      $('item').each((_i, elem) => {
         try {
           const title = $(elem).find('title').text().trim();
           const link = $(elem).find('link').text().trim();

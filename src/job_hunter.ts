@@ -10,12 +10,12 @@ import { config } from 'dotenv';
 import { writeFile, mkdir, readFile, readdir } from 'fs/promises';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
-import { adaptiveScan, scanAllPlatforms } from './scrapers/index.js';
-import { RSSJobScraper } from './scrapers/rss-scraper.js';
-import { WebSearchJobScraper } from './scrapers/websearch-scraper.js';
+import { JoobleJobScraper } from './scrapers/jooble-scraper.js';
+import { JSearchJobScraper } from './scrapers/jsearch-scraper.js';
+import { SearchAPIJobScraper } from './scrapers/searchapi-scraper.js';
 import { matchJobs } from './keyword-matcher.js';
 import { sendToTelegram, sendErrorNotification } from './telegram.js';
-import { logger, deduplicateJobs, Job } from './utils.js';
+import { logger, deduplicateJobs, Job, generateJobId } from './utils.js';
 
 // Load environment variables
 config();
@@ -51,38 +51,61 @@ async function main() {
   logger.info(`Date: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })}`);
 
   try {
-    // Step 1: Hybrid 3-Tier Job Scraping
-    logger.info('📡 Step 1: Hybrid job scraping (3-tier approach)...');
+    // Step 1: Hybrid 4-Tier Job Scraping with FREE APIs
+    logger.info('📡 Step 1: Hybrid job scraping (4-tier API approach)...');
 
     let jobs: Job[] = [];
-    const mode = process.env.MODE || 'adaptive';
 
     // ═══════════════════════════════════════════════════════════
-    // TIER 1: RSS FEEDS (Fastest, most reliable, bot-friendly)
+    // TIER 1: JOOBLE API (Primary - Best Quality)
     // ═══════════════════════════════════════════════════════════
-    logger.info('📡 Tier 1: RSS Feed Scraping...');
+    logger.info('📡 Tier 1: Jooble API (Primary Source)...');
 
-    const rssScraper = new RSSJobScraper();
-    const rssKeywords = ['AI Engineer', 'ML Engineer', 'Machine Learning', 'Digital Transformation', 'Full Stack Developer'];
+    const joobleKeywords = [
+      'Digital Transformation Specialist',
+      'AI Engineer',
+      'ML Engineer',
+      'GenAI Developer',
+      'Full Stack Developer',
+      'Software Engineer'
+    ];
 
-    for (const keyword of rssKeywords) {
+    const jooble = new JoobleJobScraper();
+    const joobleJobs = await jooble.searchMultipleKeywords(joobleKeywords, 'Riyadh');
+    jobs.push(...joobleJobs);
+
+    logger.info(`📊 Tier 1 Complete: ${jobs.length} jobs from Jooble API`);
+
+    // ═══════════════════════════════════════════════════════════
+    // TIER 2: JSEARCH API (Secondary - Google Jobs)
+    // ═══════════════════════════════════════════════════════════
+    if (jobs.length < 10) {
+      logger.info('🔍 Tier 2: JSearch API (Google Jobs)...');
+      logger.warn(`Only ${jobs.length} jobs from Jooble, trying JSearch...`);
+
       try {
-        const rssJobs = await rssScraper.scrapeRSS(keyword, 'Riyadh', 'indeed');
-        jobs.push(...rssJobs);
-        logger.info(`  ✓ RSS: "${keyword}" found ${rssJobs.length} jobs`);
+        const jsearch = new JSearchJobScraper();
+        const jsearchJobs = await jsearch.searchJobs(
+          'Software Engineer OR Full Stack OR AI Engineer OR Digital Transformation',
+          'Riyadh, Saudi Arabia'
+        );
+        jobs.push(...jsearchJobs);
+
+        logger.info(`📊 Tier 2 Complete: ${jobs.length} total jobs`);
       } catch (error) {
-        logger.warn(`  ✗ RSS: "${keyword}" failed:`, error);
+        logger.error('❌ JSearch failed:', error);
+        logger.info('💡 Continuing to Tier 3...');
       }
+    } else {
+      logger.info('✅ Tier 1 sufficient, skipping JSearch');
     }
 
-    logger.info(`📊 Tier 1 Complete: ${jobs.length} jobs from RSS feeds`);
-
     // ═══════════════════════════════════════════════════════════
-    // TIER 2: WEBSEARCH + AI (Unlimited, no rate limits)
+    // TIER 3: WEBSEARCH (Existing Pregenerated Data)
     // ═══════════════════════════════════════════════════════════
-    if (jobs.length < 5) {
-      logger.info('🔍 Tier 2: WebSearch Results (from pre-generated data)...');
-      logger.warn(`Only ${jobs.length} jobs from RSS, loading WebSearch results...`);
+    if (jobs.length < 15) {
+      logger.info('📂 Tier 3: WebSearch Pregenerated Data...');
+      logger.warn(`Only ${jobs.length} jobs so far, loading WebSearch results...`);
 
       try {
         // Check for WebSearch JSON files in data/ directory
@@ -139,46 +162,42 @@ async function main() {
         logger.info('💡 Continuing with Tier 3 scraping...');
       }
     } else {
-      logger.info('✅ Tier 1 sufficient, skipping WebSearch');
+      logger.info('✅ Tiers 1+2 sufficient, skipping WebSearch');
     }
 
     // ═══════════════════════════════════════════════════════════
-    // TIER 3: DIRECT/PROXY SCRAPING (Existing infrastructure)
+    // TIER 4: SEARCHAPI (Emergency Backup - Rare Use)
     // ═══════════════════════════════════════════════════════════
-    if (jobs.length < 10) {
-      logger.info('🌐 Tier 3: Direct Scraping with Proxy Fallback...');
-      logger.warn(`Only ${jobs.length} jobs so far, triggering direct/proxy scraping...`);
+    if (jobs.length < 20) {
+      logger.info('🚨 Tier 4: SearchAPI Emergency Backup...');
+      logger.warn(`Only ${jobs.length} jobs, triggering emergency backup...`);
 
-      let tier3Jobs: Job[];
+      try {
+        const searchapi = new SearchAPIJobScraper();
+        const searchapiJobs = await searchapi.searchJobs(
+          'software developer OR engineer',
+          'Riyadh Saudi Arabia'
+        );
+        jobs.push(...searchapiJobs);
 
-      switch (mode) {
-        case 'quick':
-          tier3Jobs = await scanAllPlatforms('quick');
-          break;
-        case 'deep':
-          tier3Jobs = await scanAllPlatforms('deep');
-          break;
-        case 'adaptive':
-        default:
-          const targetRemaining = Math.max(10 - jobs.length, 5); // At least 5 more jobs
-          tier3Jobs = await adaptiveScan(targetRemaining);
-          break;
+        logger.info(`📊 Tier 4 Complete: ${jobs.length} total jobs`);
+      } catch (error) {
+        logger.error('❌ SearchAPI failed:', error);
+        logger.info('💡 Continuing with existing jobs...');
       }
-
-      logger.info(`📊 Tier 3 found ${tier3Jobs.length} additional jobs`);
-      jobs.push(...tier3Jobs);
     } else {
-      logger.info('✅ Tiers 1+2 sufficient, skipping direct scraping');
+      logger.info('✅ Tiers 1-3 sufficient, skipping emergency backup');
     }
 
     // Deduplicate across all tiers
     const uniqueJobs = deduplicateJobs(jobs);
 
     logger.info(`\n═══════════════════════════════════════════════════════════`);
-    logger.info(`✅ Hybrid Scraping Complete:`);
+    logger.info(`✅ 4-Tier API Scraping Complete:`);
     logger.info(`   Total scraped: ${jobs.length} jobs`);
     logger.info(`   After deduplication: ${uniqueJobs.length} unique jobs`);
-    logger.info(`   Platforms: ${[...new Set(uniqueJobs.map(j => j.platform))].join(', ')}`);
+    logger.info(`   Sources: ${[...new Set(uniqueJobs.map(j => j.platform))].join(', ')}`);
+    logger.info(`   Cost: $0 (100% FREE APIs)`);
     logger.info(`═══════════════════════════════════════════════════════════\n`);
 
     jobs = uniqueJobs;

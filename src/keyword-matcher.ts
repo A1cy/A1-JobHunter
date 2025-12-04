@@ -46,14 +46,14 @@ export class KeywordJobMatcher {
     }
 
     // 2. Skills Match (30 points max)
-    const skillsFound = this.findSkills(job.description);
+    const skillsFound = this.findSkills(job.description || '');
     score += skillsFound.length * 6;
     if (skillsFound.length > 0) {
       reasons.push(`Requires ${skillsFound.join(', ')} (matches your expertise)`);
     }
 
     // 3. Technology Match (20 points max)
-    const techsFound = this.findTechnologies(job.description);
+    const techsFound = this.findTechnologies(job.description || '');
     const techScore = Math.min(techsFound.length * 2, 20);
     score += techScore;
     if (techsFound.length > 0) {
@@ -91,7 +91,33 @@ export class KeywordJobMatcher {
   }
 
   /**
-   * Score job title match (0-40 points)
+   * Levenshtein distance for fuzzy string matching
+   * Allows 2-character differences for typos and variations
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix: number[][] = Array(str2.length + 1).fill(null)
+      .map(() => Array(str1.length + 1).fill(null));
+
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,      // insertion
+          matrix[j - 1][i] + 1,      // deletion
+          matrix[j - 1][i - 1] + indicator  // substitution
+        );
+      }
+    }
+
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Score job title match with fuzzy logic (0-40 points)
+   * Improved to handle partial matches and typos
    */
   private scoreTitleMatch(title: string): { score: number; matchedRole: string | null } {
     // Expand both title and roles for matching (handles ML ↔ Machine Learning, etc.)
@@ -101,20 +127,34 @@ export class KeywordJobMatcher {
 
     for (const role of this.profile.target_roles) {
       const expandedRole = this.expandWithAbbreviations(role);
-      const roleWords = expandedRole.split(' ').filter(w => w.length > 0);
-      const titleWords = expandedTitle.split(' ').filter(w => w.length > 0);
+      // Filter out short words (a, in, or, etc.) that don't add meaning
+      const roleWords = expandedRole.split(' ').filter(w => w.length > 2);
+      const titleWords = expandedTitle.split(' ').filter(w => w.length > 2);
 
-      // Count matching words
+      // NEW: Fuzzy matching - count partial word matches
       const matchingWords = roleWords.filter(word =>
-        titleWords.some(titleWord => titleWord.includes(word) || word.includes(titleWord))
+        titleWords.some(titleWord =>
+          titleWord.includes(word) ||
+          word.includes(titleWord) ||
+          this.levenshteinDistance(word, titleWord) <= 2  // Allow 2 char difference
+        )
       );
 
       // Use original role length for ratio calculation (not expanded)
-      const originalRoleLength = role.split(' ').length;
-      const matchRatio = matchingWords.length / originalRoleLength;
+      const originalRoleLength = role.split(' ').filter(w => w.length > 2).length;
+      const matchRatio = originalRoleLength > 0 ? matchingWords.length / originalRoleLength : 0;
 
-      // Exact match: 40 points, Partial: 20-35 points
-      const score = matchRatio === 1.0 ? 40 : Math.floor(matchRatio * 35);
+      // NEW: More generous scoring
+      // Exact match: 40 points
+      // 80%+ match: 35 points
+      // 60%+ match: 30 points
+      // 40%+ match: 20 points
+      let score = 0;
+      if (matchRatio >= 1.0) score = 40;
+      else if (matchRatio >= 0.8) score = 35;
+      else if (matchRatio >= 0.6) score = 30;
+      else if (matchRatio >= 0.4) score = 20;
+      else score = Math.floor(matchRatio * 15);
 
       if (score > bestScore) {
         bestScore = score;
@@ -194,7 +234,7 @@ async function loadUserProfile(): Promise<UserProfile> {
 }
 
 /**
- * Main export: Match jobs using FREE keyword matching
+ * Main export: Match jobs using FREE keyword matching with smart guarantees
  */
 export async function matchJobs(jobs: Job[]): Promise<Job[]> {
   logger.info(`🔍 Starting FREE keyword-based matching for ${jobs.length} jobs...`);
@@ -203,11 +243,36 @@ export async function matchJobs(jobs: Job[]): Promise<Job[]> {
   const matcher = new KeywordJobMatcher(profile);
 
   const scoredJobs = matcher.scoreJobs(jobs);
-  // Lower threshold to 55 to account for abbreviation-heavy job descriptions
-  const minScore = 55;
-  const filteredJobs = matcher.filterByScore(scoredJobs, minScore);
 
-  logger.info(`✅ Keyword matching complete: ${filteredJobs.length}/${jobs.length} jobs passed threshold (≥${minScore}%)`);
+  // NEW: Smart threshold - ensure minimum results
+  const BASE_THRESHOLD = 45;  // Lowered from 55 to 45 (more lenient)
+  const MIN_RESULTS = 5;      // Always return at least 5 jobs if available
+  const MAX_RESULTS = 20;     // Cap at 20 to avoid overwhelming user
+
+  // Sort by score (highest first)
+  const sortedJobs = scoredJobs.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  // Filter by threshold
+  let filteredJobs = sortedJobs.filter(job => (job.score || 0) >= BASE_THRESHOLD);
+
+  // Guarantee minimum results if we have enough jobs
+  if (filteredJobs.length < MIN_RESULTS && sortedJobs.length >= MIN_RESULTS) {
+    logger.warn(`Only ${filteredJobs.length} passed threshold, taking top ${MIN_RESULTS} jobs`);
+    filteredJobs = sortedJobs.slice(0, MIN_RESULTS);
+  }
+
+  // Cap at maximum to avoid overwhelming user
+  if (filteredJobs.length > MAX_RESULTS) {
+    logger.info(`Capping results at ${MAX_RESULTS} top matches`);
+    filteredJobs = filteredJobs.slice(0, MAX_RESULTS);
+  }
+
+  const avgScore = filteredJobs.length > 0
+    ? Math.round(filteredJobs.reduce((sum, job) => sum + (job.score || 0), 0) / filteredJobs.length)
+    : 0;
+
+  logger.info(`✅ Keyword matching complete: ${filteredJobs.length}/${jobs.length} jobs passed (≥${BASE_THRESHOLD}% or top ${MIN_RESULTS})`);
+  logger.info(`📊 Average match score: ${avgScore}%`);
 
   return filteredJobs;
 }
