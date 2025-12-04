@@ -80,14 +80,26 @@ export class KeywordJobMatcher {
    * - Semantic similarity: 0-15 bonus points (BERT-based)
    * - TF-IDF weighting: 0-10 bonus points (keyword importance)
    * Total: 0-125 points (capped at 100)
+   *
+   * IMPORTANT: Title match is MANDATORY - jobs with poor title matches are rejected
+   * to prevent cross-domain contamination (e.g., HR profiles getting IT jobs)
    */
   scoreJob(job: Job): { score: number; matchReasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
 
-    // 1. Title Match (40 points max)
+    // 1. Title Match (40 points max) - MANDATORY FILTER
     const titleResult = this.scoreTitleMatch(job.title);
     score += titleResult.score;
+
+    // 🚨 MANDATORY: Reject jobs with poor title match (<40% = <16 points)
+    // This prevents cross-domain contamination (HR getting IT jobs, etc.)
+    const MIN_TITLE_SCORE = 16; // 40% of 40 points
+    if (titleResult.score < MIN_TITLE_SCORE) {
+      // Job title doesn't match any target role - reject immediately
+      return { score: 0, matchReasons: ['Title does not match any target role'] };
+    }
+
     if (titleResult.matchedRole) {
       reasons.push(`Role matches ${titleResult.matchedRole}`);
     }
