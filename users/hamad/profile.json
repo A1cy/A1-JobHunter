@@ -1,0 +1,36 @@
+{
+  "name": "Hamad Alturafi",
+  "location": "Riyadh, Saudi Arabia",
+  "target_roles": [
+    "HR Specialist",
+    "HR Generalist",
+    "HR Officer",
+    "Organization Development Specialist",
+    "Compensation & Benefits Specialist",
+    "Learning & Development Specialist",
+    "Employee Relations Specialist",
+    "HRIS Systems Specialist",
+    "Payroll Specialist",
+    "HR Business Partner"
+  ],
+  "skills": {
+    "primary": [
+      "Human Resources Management",
+      "Organization Development",
+      "Compensation & Benefits",
+      "Learning & Development",
+      "Employee Relations",
+      "Payroll Management"
+    ],
+    "technologies": [
+      "HRIS Systems",
+      "Workday",
+      "SAP SuccessFactors",
+      "Oracle HCM",
+      "Microsoft Excel",
+      "HR Analytics"
+    ]
+  },
+  "min_experience_match": 0.5,
+  "languages": ["Arabic", "English"]
+}

@@ -13,8 +13,8 @@ import { existsSync } from 'fs';
 import { JoobleJobScraper } from './scrapers/jooble-scraper.js';
 import { JSearchJobScraper } from './scrapers/jsearch-scraper.js';
 import { SearchAPIJobScraper } from './scrapers/searchapi-scraper.js';
-import { matchJobs } from './keyword-matcher.js';
-import { sendToTelegram, sendErrorNotification } from './telegram.js';
+import { matchJobsForAllUsers } from './multi-user-matcher.js';
+import { sendToAllUsers, sendErrorNotificationToAllUsers } from './multi-user-telegram.js';
 import { logger, deduplicateJobs, Job, generateJobId } from './utils.js';
 
 // Load environment variables
@@ -203,74 +203,72 @@ async function main() {
     jobs = uniqueJobs;
 
     if (jobs.length === 0) {
-      logger.warn('⚠️ No jobs found. Notifying user with error details...');
+      logger.warn('⚠️ No jobs found from any source');
+      logger.info('💡 All users will be notified that no jobs were found today');
 
-      // sendToTelegram now handles 0 jobs case internally
-      await sendToTelegram([]);
+      // Even with 0 jobs, send notification to all users
+      await sendToAllUsers([]);
 
-      logger.info('✅ Job hunt complete (no results) - User notified');
+      logger.info('✅ Job hunt complete (no results) - All users notified');
       return;
     }
 
-    // Step 2: FREE keyword matching
-    logger.info('🔍 Step 2: FREE keyword-based matching...');
+    // Step 2: Multi-user matching
+    logger.info('🔍 Step 2: Multi-user matching...');
 
-    const matchedJobs = await matchJobs(jobs);
+    const userResults = await matchJobsForAllUsers(jobs);
 
-    logger.info(`✅ ${matchedJobs.length} jobs matched criteria (${Math.round((matchedJobs.length / jobs.length) * 100)}% pass rate)`);
-
-    if (matchedJobs.length === 0) {
-      logger.warn('⚠️ No jobs passed matching threshold');
-
-      // sendToTelegram now handles 0 jobs case internally
-      await sendToTelegram([]);
-
-      logger.info('✅ Job hunt complete (no matches) - User notified');
+    if (userResults.length === 0) {
+      logger.error('❌ No enabled users found with valid Telegram chat IDs');
+      logger.info('💡 Make sure users have:');
+      logger.info('   1. profile.json in users/[username]/ directory');
+      logger.info('   2. config.json with enabled: true');
+      logger.info('   3. telegram_chat_id configured in config.json');
       return;
     }
 
-    // Step 3: Sort by relevance (score)
-    const sortedJobs = matchedJobs.sort((a, b) => (b.score || 0) - (a.score || 0));
+    logger.info(`\n═══════════════════════════════════════════════════════════`);
+    logger.info(`✅ Multi-User Matching Complete:`);
+    userResults.forEach(result => {
+      logger.info(`   - ${result.username} (${result.profile.name}): ${result.matched_jobs.length} jobs (avg ${result.stats.avg_score}%)`);
+    });
+    logger.info(`═══════════════════════════════════════════════════════════\n`);
 
-    const avgScore = Math.round(
-      sortedJobs.reduce((sum, job) => sum + (job.score || 0), 0) / sortedJobs.length
-    );
-    const highMatchCount = sortedJobs.filter(job => (job.score || 0) >= 85).length;
-
-    logger.info(`📊 Average match score: ${avgScore}%`);
-    logger.info(`🌟 High match (≥85%): ${highMatchCount} jobs`);
-
-    // Step 4: Save results locally
+    // Step 3: Save results for all users
     logger.info('💾 Step 3: Saving results...');
 
-    await saveResults(sortedJobs);
+    // Save combined results (for backward compatibility)
+    const allMatchedJobs = userResults.flatMap(r => r.matched_jobs);
+    await saveResults(allMatchedJobs);
 
-    // Step 5: Send to Telegram
-    logger.info('📱 Step 4: Sending to Telegram...');
+    // Step 4: Send personalized jobs to each user
+    logger.info('📱 Step 4: Sending personalized results to each user...');
 
-    await sendToTelegram(sortedJobs);
+    await sendToAllUsers(userResults);
 
     // Done!
     const duration = Math.round((Date.now() - startTime) / 1000);
 
-    logger.info(`✅ Job hunt complete! Found ${sortedJobs.length} relevant jobs`);
+    logger.info(`✅ Job hunt complete for all users!`);
     logger.info(`⏱️ Total time: ${duration}s`);
 
     // Summary stats
     logger.info('\n📊 Summary:');
+    logger.info(`   Users processed: ${userResults.length}`);
     logger.info(`   Jobs scraped: ${jobs.length}`);
-    logger.info(`   Jobs matched: ${matchedJobs.length}`);
-    logger.info(`   Avg score: ${avgScore}%`);
-    logger.info(`   High matches: ${highMatchCount}`);
+    logger.info(`   Total jobs sent: ${allMatchedJobs.length}`);
+    userResults.forEach(result => {
+      logger.info(`   - ${result.username}: ${result.matched_jobs.length} jobs (${result.stats.avg_score}% avg)`);
+    });
     logger.info(`   Platforms: ${[...new Set(jobs.map(j => j.platform))].join(', ')}`);
     logger.info(`   Duration: ${duration}s`);
 
   } catch (error) {
     logger.error('❌ Job hunt failed:', error);
 
-    // Send error notification to Telegram
+    // Send error notification to all users
     if (error instanceof Error) {
-      await sendErrorNotification(error);
+      await sendErrorNotificationToAllUsers(error);
     }
 
     // Exit with error code

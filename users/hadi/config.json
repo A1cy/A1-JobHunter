@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "telegram_chat_id": "",
+  "name": "Hadi",
+  "email": "alhadi@a1xai.com",
+  "matching_threshold": 45,
+  "max_jobs_per_day": 20
+}

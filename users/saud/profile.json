@@ -1,0 +1,31 @@
+{
+  "name": "Saud Alrasheed",
+  "location": "Riyadh, Saudi Arabia",
+  "target_roles": [
+    "Product Specialist",
+    "Product Manager",
+    "Brand Manager",
+    "Product Specifications Consultant",
+    "Product Consultant",
+    "Business Development Consultant"
+  ],
+  "skills": {
+    "primary": [
+      "Product Management",
+      "Brand Strategy",
+      "Digital Marketing",
+      "E-commerce",
+      "Market Research"
+    ],
+    "technologies": [
+      "SEO/PPC",
+      "Google Ads",
+      "Social Media Marketing",
+      "HubSpot",
+      "Google Analytics",
+      "LinkedIn Marketing"
+    ]
+  },
+  "min_experience_match": 0.5,
+  "languages": ["Arabic", "English"]
+}

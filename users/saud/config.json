@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "telegram_chat_id": "8565952880",
+  "name": "Saud",
+  "email": "Y5.6@hotmail.com",
+  "matching_threshold": 50,
+  "max_jobs_per_day": 15
+}
