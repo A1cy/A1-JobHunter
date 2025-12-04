@@ -73,6 +73,49 @@ export class KeywordJobMatcher {
   }
 
   /**
+   * Check if job title contains cross-domain keywords that conflict with profile
+   */
+  private hasCrossDomainConflict(jobTitle: string): boolean {
+    const titleLower = jobTitle.toLowerCase();
+    const targetRolesStr = this.profile.target_roles.join(' ').toLowerCase();
+
+    // Define domain-specific keywords
+    const itKeywords = ['software', 'developer', 'programming', 'ai engineer', 'ml engineer',
+                        'data scientist', 'devops', 'full stack', 'frontend', 'backend',
+                        'digital transformation', 'machine learning', 'artificial intelligence'];
+    const hrKeywords = ['hr specialist', 'hr generalist', 'hr officer', 'recruitment',
+                       'payroll', 'hris', 'employee relations', 'hr business partner'];
+
+    // If profile is HR-focused but job has IT keywords → reject
+    if (targetRolesStr.includes('hr') && !targetRolesStr.includes('software')) {
+      if (itKeywords.some(k => titleLower.includes(k))) {
+        return true; // HR profile getting IT job
+      }
+    }
+
+    // If profile is IT-focused but job has HR keywords → reject
+    if ((targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
+         targetRolesStr.includes('ai') || targetRolesStr.includes('engineer')) &&
+        !targetRolesStr.includes('hr')) {
+      if (hrKeywords.some(k => titleLower.includes(k))) {
+        return true; // IT profile getting HR job
+      }
+    }
+
+    // If profile is Marketing-focused but job has IT/HR keywords → reject
+    if ((targetRolesStr.includes('product') || targetRolesStr.includes('marketing') ||
+         targetRolesStr.includes('brand')) &&
+        !targetRolesStr.includes('software') && !targetRolesStr.includes('hr')) {
+      if (itKeywords.some(k => titleLower.includes(k)) ||
+          hrKeywords.some(k => titleLower.includes(k))) {
+        return true; // Marketing profile getting IT/HR job
+      }
+    }
+
+    return false; // No conflict
+  }
+
+  /**
    * Score a job based on keyword matching + semantic similarity + TF-IDF (0-100)
    *
    * Scoring breakdown:
@@ -88,13 +131,19 @@ export class KeywordJobMatcher {
     let score = 0;
     const reasons: string[] = [];
 
+    // 0. Cross-Domain Filter (FIRST CHECK)
+    if (this.hasCrossDomainConflict(job.title)) {
+      return { score: 0, matchReasons: ['Job domain does not match profile (IT/HR/Marketing conflict)'] };
+    }
+
     // 1. Title Match (40 points max) - MANDATORY FILTER
     const titleResult = this.scoreTitleMatch(job.title);
     score += titleResult.score;
 
-    // 🚨 MANDATORY: Reject jobs with poor title match (<40% = <16 points)
+    // 🚨 MANDATORY: Reject jobs with poor title match (<62.5% = <25 points)
     // This prevents cross-domain contamination (HR getting IT jobs, etc.)
-    const MIN_TITLE_SCORE = 16; // 40% of 40 points
+    // Requires at least 60%+ word match ratio between job title and target roles
+    const MIN_TITLE_SCORE = 25; // 62.5% of 40 points
     if (titleResult.score < MIN_TITLE_SCORE) {
       // Job title doesn't match any target role - reject immediately
       return { score: 0, matchReasons: ['Title does not match any target role'] };
