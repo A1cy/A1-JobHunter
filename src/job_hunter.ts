@@ -136,6 +136,8 @@ async function main() {
     async function scrapeGoogle(keywords: string[]): Promise<Job[]> {
       try {
         logger.info('🔍 [Google] Starting (TIER 1 - PRIMARY)...');
+        logger.info(`🔑 [Google] API Key configured: ${!!process.env.GOOGLE_API_KEY}`);
+        logger.info(`🔑 [Google] CX configured: ${!!process.env.GOOGLE_CX}`);
 
         const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
         const GOOGLE_CX = process.env.GOOGLE_CX;
@@ -153,9 +155,14 @@ async function main() {
         const locationFilter = ' Riyadh Saudi Arabia';
         const fullQuery = `${searchQuery}${locationFilter}${siteFilter}`;
 
+        logger.info(`📝 [Google] Search query: ${fullQuery.substring(0, 150)}...`);
+        logger.info(`📄 [Google] Fetching up to 5 pages (50 results max)...`);
+
         // Fetch up to 5 pages (50 results) to stay within daily limit (100 req/day)
         for (let page = 0; page < 5; page++) {
           const startIndex = page * 10 + 1; // 1, 11, 21, 31, 41
+
+          logger.info(`📄 [Google] Fetching page ${page + 1} (startIndex: ${startIndex})...`);
 
           const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(fullQuery)}&start=${startIndex}`;
 
@@ -167,9 +174,18 @@ async function main() {
 
             const data = response.body as any;
 
+            logger.info(`📦 [Google] Page ${page + 1} - Response received, items: ${data.items?.length || 0}`);
+
             if (!data.items || data.items.length === 0) {
-              logger.debug(`[Google] No more results at page ${page + 1}`);
+              logger.info(`⚠️  [Google] Page ${page + 1} - No more results, stopping pagination`);
               break; // No more results
+            }
+
+            // Log first result for debugging
+            if (page === 0 && data.items.length > 0) {
+              logger.info(`📋 [Google] Sample result - Title: "${data.items[0].title}"`);
+              logger.info(`📋 [Google] Sample result - Link: ${data.items[0].link}`);
+              logger.info(`📋 [Google] Sample result - Snippet: ${data.items[0].snippet?.substring(0, 100)}...`);
             }
 
             // Parse Google results into Job format
@@ -192,20 +208,31 @@ async function main() {
               });
             }
 
+            logger.info(`✅ [Google] Page ${page + 1} - Parsed ${data.items.length} jobs (total so far: ${allJobs.length})`);
+
             // Rate limit: 1 request per second
             await new Promise(r => setTimeout(r, 1000));
 
-          } catch (pageError) {
-            logger.warn(`[Google] Page ${page + 1} failed:`, pageError);
+          } catch (pageError: any) {
+            logger.error(`❌ [Google] Page ${page + 1} failed:`, pageError.message || pageError);
+            if (pageError.response) {
+              logger.error(`❌ [Google] API Response: ${JSON.stringify(pageError.response.body).substring(0, 200)}`);
+            }
             break; // Stop pagination on error
           }
         }
 
-        logger.info(`✅ [Google] ${allJobs.length} jobs found`);
+        logger.info(`✅ [Google] TOTAL JOBS SCRAPED: ${allJobs.length} jobs`);
+        if (allJobs.length > 0) {
+          logger.info(`📋 [Google] Sample jobs:`);
+          allJobs.slice(0, 3).forEach((job, i) => {
+            logger.info(`   ${i + 1}. "${job.title}" at ${job.company}`);
+          });
+        }
         return allJobs;
 
-      } catch (error) {
-        logger.error('❌ [Google] Failed:', error);
+      } catch (error: any) {
+        logger.error('❌ [Google] Failed:', error.message || error);
         return [];
       }
     }
@@ -394,16 +421,17 @@ async function main() {
     logger.info('\n🚀 Launching all scrapers in parallel...\n');
 
     // Execute all scrapers concurrently
+    // 🚨 DEBUGGING: ONLY GOOGLE ENABLED - All other scrapers disabled to test Google API
     const scraperResults = await Promise.allSettled([
-      scrapeGoogle(searchKeywords),      // 🆕 Tier 1 - PRIMARY (Google Custom Search)
-      scrapeJooble(searchKeywords),       // Tier 2 (was Tier 1)
-      scrapeJSearch(searchKeywords),      // Tier 3 (was Tier 2)
-      scrapeBayt(searchKeywords),         // Tier 4 (NEW)
-      scrapeIndeed(searchKeywords),       // Tier 5 (NEW)
-      scrapeRSS(searchKeywords),          // Tier 6 (NEW)
-      loadWebSearchData(),                // Tier 7 (was Tier 3)
-      scrapeSearchAPI(searchKeywords),    // Tier 8 (was Tier 4 - FIXED)
-      scrapeLinkedIn(searchKeywords)      // Tier 9 (NEW - backup)
+      scrapeGoogle(searchKeywords),      // 🆕 Tier 1 - PRIMARY (Google Custom Search) - ONLY ONE ACTIVE
+      // scrapeJooble(searchKeywords),       // Tier 2 - DISABLED FOR DEBUGGING
+      // scrapeJSearch(searchKeywords),      // Tier 3 - DISABLED FOR DEBUGGING
+      // scrapeBayt(searchKeywords),         // Tier 4 - DISABLED FOR DEBUGGING
+      // scrapeIndeed(searchKeywords),       // Tier 5 - DISABLED FOR DEBUGGING
+      // scrapeRSS(searchKeywords),          // Tier 6 - DISABLED FOR DEBUGGING
+      // loadWebSearchData(),                // Tier 7 - DISABLED FOR DEBUGGING
+      // scrapeSearchAPI(searchKeywords),    // Tier 8 - DISABLED FOR DEBUGGING
+      // scrapeLinkedIn(searchKeywords)      // Tier 9 - DISABLED FOR DEBUGGING
     ]);
 
     // Collect jobs from all successful scrapers

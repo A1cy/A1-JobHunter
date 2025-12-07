@@ -192,32 +192,67 @@ export async function matchJobsForAllUsers(allJobs: Job[]): Promise<UserMatchRes
     const profileText = SemanticJobMatcher.buildProfileText(user.profile);
     await semanticMatcher.initialize(profileText);
 
+    // 🚨 DEBUGGING: Track jobs through each phase
+    logger.info(`\n🔬 [DEBUG] ${user.username} - Starting job matching pipeline:`);
+    logger.info(`   📥 Input: ${allJobs.length} total jobs`);
+
     // Phase 3: Score jobs with TF-IDF weighting
     const profileKeywords = extractProfileKeywords(user.profile);
+    logger.info(`   🔑 Profile keywords: ${profileKeywords.slice(0, 10).join(', ')}...`);
     let enhancedJobs = tfidfScorer.scoreJobs(allJobs, profileKeywords);
+    logger.info(`   ✅ Phase 3 (TF-IDF): ${enhancedJobs.length} jobs scored`);
 
     // Phase 4: Add semantic similarity scores
     if (semanticMatcher.isReady()) {
       enhancedJobs = await semanticMatcher.scoreJobs(enhancedJobs);
+      logger.info(`   ✅ Phase 4 (Semantic): ${enhancedJobs.length} jobs enhanced`);
     } else {
-      logger.warn(`⚠️  Semantic matching disabled for ${user.username}`);
+      logger.warn(`   ⚠️  Phase 4 (Semantic): Disabled for ${user.username}`);
     }
 
-    // Phase 5: Keyword matching (now includes semantic + TF-IDF bonuses)
+    // Phase 5: Keyword matching (now includes semantic + TF-IDF bonuses + DOMAIN FILTERING)
+    logger.info(`   🔍 Phase 5 (Keyword + Domain Filter): Starting...`);
     const matcher = new KeywordJobMatcher(user.profile);
     const scoredJobs = matcher.scoreJobs(enhancedJobs);
 
+    // Count how many jobs scored > 0 (passed domain filtering)
+    const passedDomainFilter = scoredJobs.filter(j => (j.score || 0) > 0).length;
+    const rejectedByDomainFilter = scoredJobs.length - passedDomainFilter;
+    logger.info(`   ✅ Phase 5 Complete: ${passedDomainFilter} jobs passed domain filter`);
+    logger.info(`   ❌ Phase 5 Rejected: ${rejectedByDomainFilter} jobs failed domain filter`);
+
+    if (passedDomainFilter > 0 && passedDomainFilter <= 5) {
+      // Show sample of passed jobs
+      const samplePassed = scoredJobs.filter(j => (j.score || 0) > 0).slice(0, 3);
+      logger.info(`   📋 Sample jobs that PASSED domain filter:`);
+      samplePassed.forEach((job, i) => {
+        logger.info(`      ${i + 1}. "${job.title}" - Score: ${job.score}%`);
+      });
+    }
+
+    if (rejectedByDomainFilter > 0 && rejectedByDomainFilter <= 10) {
+      // Show sample of rejected jobs
+      const sampleRejected = scoredJobs.filter(j => (j.score || 0) === 0).slice(0, 3);
+      logger.info(`   📋 Sample jobs that FAILED domain filter:`);
+      sampleRejected.forEach((job, i) => {
+        logger.info(`      ${i + 1}. "${job.title}" - Reason: ${job.matchReasons?.[0] || 'Unknown'}`);
+      });
+    }
+
     // Phase 6: Filter by user's threshold and limits
+    logger.info(`   🔍 Phase 6 (Threshold ${user.config.matching_threshold}% + Min 40%): Starting...`);
     const matchedJobs = filterByUserThreshold(
       scoredJobs,
       user.config.matching_threshold,
       user.config.max_jobs_per_day
     );
+    logger.info(`   ✅ Phase 6 Complete: ${matchedJobs.length} jobs passed threshold`);
 
     // Calculate statistics
     const stats = calculateStats(matchedJobs, allJobs.length);
 
-    logger.info(`   ✅ ${user.username}: ${matchedJobs.length} jobs matched (avg ${stats.avg_score}%, high match: ${stats.high_match_count})`);
+    logger.info(`\n   ✅ ${user.username} FINAL RESULT: ${matchedJobs.length} jobs matched (avg ${stats.avg_score}%, high match: ${stats.high_match_count})`);
+    logger.info(`   ═══════════════════════════════════════\n`);
 
     results.push({
       username: user.username,
