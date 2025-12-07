@@ -68,18 +68,17 @@ async function main() {
     // Extract unique keywords from all user profiles
     const allKeywords = new Set<string>();
     for (const user of users) {
-      // Dynamic import of user profile
-      const profilePath = `../users/${user.username}/profile.json`;
-      const { default: profile } = await import(profilePath, { assert: { type: 'json' } });
+      // Use already-loaded profile data from user.profile
+      // No need to re-import - loadAllUsers() already loaded it!
 
       // Add target roles as keywords
-      for (const role of profile.target_roles) {
+      for (const role of user.profile.target_roles) {
         allKeywords.add(role);
       }
 
       // Add primary skills as keywords
-      if (profile.skills?.primary) {
-        for (const skill of profile.skills.primary) {
+      if (user.profile.skills?.primary) {
+        for (const skill of user.profile.skills.primary) {
           allKeywords.add(skill);
         }
       }
