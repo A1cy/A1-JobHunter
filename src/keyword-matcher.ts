@@ -215,10 +215,12 @@ export class KeywordJobMatcher {
       return { score: 0, matchReasons: ['Not in user domain (missing required HR/Product/IT keywords)'] };
     }
 
-    // 0B. Cross-Domain Blacklist (SECOND CHECK - DOUBLE-CHECK FOR CONFLICTS)
-    if (this.hasCrossDomainConflict(job)) {  // ✅ Now passes full job object
-      return { score: 0, matchReasons: ['Job domain does not match profile (IT/HR/Marketing conflict)'] };
-    }
+    // 0B. ✅ REMOVED: Cross-Domain Blacklist (user request - Fix #1)
+    // User insight: "no need for filtring ! since the searching now done using each user targted postion"
+    // Impact: This was rejecting 26-28 jobs per user (90% of results in Run #29)
+    // if (this.hasCrossDomainConflict(job)) {
+    //   return { score: 0, matchReasons: ['Job domain does not match profile (IT/HR/Marketing conflict)'] };
+    // }
 
     // 1. Title Match (40 points max) - MANDATORY FILTER
     const titleResult = this.scoreTitleMatch(job.title);

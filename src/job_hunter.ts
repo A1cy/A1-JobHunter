@@ -209,6 +209,12 @@ async function main() {
 
         // Execute 3 domain-specific queries
         for (const domainQuery of domainQueries) {
+          // ✅ FIX #3: Skip queries with no keywords (debug logging)
+          if (domainQuery.keywords.length === 0) {
+            logger.warn(`⚠️  [Google] Skipping ${domainQuery.name} query - no keywords available`);
+            continue;
+          }
+
           logger.info(`${domainQuery.color} [Google] Starting ${domainQuery.name} query...`);
 
           const searchQuery = domainQuery.keywords.join(' OR ');
@@ -260,7 +266,13 @@ async function main() {
                 }
 
                 // VALIDATION LAYER 3: Ensure job-related URL patterns (positive filter)
-                const jobUrlPatterns = ['/jobs/', '/job/', '/careers/', '/career/', '/vacancy', '/vacancies/', '/viewjob', '/job-listing/', '/jobdetails/'];
+                // ✅ FIX #2: Relaxed patterns (removed trailing slashes, added more variations)
+                const jobUrlPatterns = [
+                  '/jobs', '/job', '/careers', '/career', '/vacancy', '/vacancies',
+                  '/viewjob', '/job-listing', '/jobdetails', '/opportunities',
+                  '/job-openings', '/current-opportunities', '/all-jobs', '/positions',
+                  '/employment', '/hiring', '/work-with-us', '/join-', '/openings'
+                ];
                 const hasJobPattern = jobUrlPatterns.some(pattern => item.link.toLowerCase().includes(pattern));
 
                 if (!hasJobPattern) {
@@ -273,6 +285,24 @@ async function main() {
                 const titleParts = item.title.split(' - ');
                 const jobTitle = titleParts[0] || item.title;
                 const company = titleParts.slice(1).join(' - ') || 'Unknown';
+
+                // VALIDATION LAYER 4: ✅ FIX #4 - Skip generic career pages by title
+                const genericTitles = [
+                  'careers', 'job search', 'search opportunities', 'current opportunities',
+                  'job openings', 'work with us', 'join our team', 'employment opportunities',
+                  'view all jobs', 'all jobs', 'open positions', 'career opportunities'
+                ];
+                const titleLower = jobTitle.toLowerCase();
+                const isGenericPage = genericTitles.some(generic =>
+                  titleLower === generic ||
+                  titleLower.includes(`${generic} |`) ||
+                  titleLower.startsWith(generic)
+                );
+
+                if (isGenericPage) {
+                  logger.warn(`   ⚠️  Skipping generic career page: ${item.title}`);
+                  continue;
+                }
 
                 allJobs.push({
                   id: generateJobId(),
