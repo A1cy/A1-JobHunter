@@ -442,18 +442,19 @@ async function main() {
 
     logger.info('\n🚀 Launching all scrapers in parallel...\n');
 
-    // Execute all scrapers concurrently
-    // 🚨 DEBUGGING: ONLY GOOGLE ENABLED - All other scrapers disabled to test Google API
+    // Execute all scrapers concurrently (ALL ENABLED - stays within Google free tier)
+    // Google API usage: 5 requests/day (5% of 100 free quota)
+    // Other scrapers use their own APIs/scraping (0 Google API calls)
     const scraperResults = await Promise.allSettled([
-      scrapeGoogle(searchKeywords),      // 🆕 Tier 1 - PRIMARY (Google Custom Search) - ONLY ONE ACTIVE
-      // scrapeJooble(searchKeywords),       // Tier 2 - DISABLED FOR DEBUGGING
-      // scrapeJSearch(searchKeywords),      // Tier 3 - DISABLED FOR DEBUGGING
-      // scrapeBayt(searchKeywords),         // Tier 4 - DISABLED FOR DEBUGGING
-      // scrapeIndeed(searchKeywords),       // Tier 5 - DISABLED FOR DEBUGGING
-      // scrapeRSS(searchKeywords),          // Tier 6 - DISABLED FOR DEBUGGING
-      // loadWebSearchData(),                // Tier 7 - DISABLED FOR DEBUGGING
-      // scrapeSearchAPI(searchKeywords),    // Tier 8 - DISABLED FOR DEBUGGING
-      // scrapeLinkedIn(searchKeywords)      // Tier 9 - DISABLED FOR DEBUGGING
+      scrapeGoogle(searchKeywords),      // Tier 1 - PRIMARY (Google Custom Search) ✅
+      scrapeJooble(searchKeywords),       // Tier 2 - FREE API ✅
+      scrapeJSearch(searchKeywords),      // Tier 3 - FREE API ✅
+      scrapeBayt(searchKeywords),         // Tier 4 - Web Scraping ✅
+      scrapeIndeed(searchKeywords),       // Tier 5 - Web Scraping ✅
+      scrapeRSS(searchKeywords),          // Tier 6 - RSS Feeds ✅
+      loadWebSearchData(),                // Tier 7 - Pregenerated Data ✅
+      scrapeSearchAPI(searchKeywords),    // Tier 8 - FREE API ✅
+      scrapeLinkedIn(searchKeywords)      // Tier 9 - Stealth Scraping ✅
     ]);
 
     // Collect jobs from all successful scrapers
