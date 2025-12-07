@@ -70,28 +70,63 @@ async function main() {
       return;
     }
 
-    // Extract unique keywords from all user profiles
-    const allKeywords = new Set<string>();
+    // Extract unique keywords from all user profiles WITH DOMAIN CATEGORIZATION
+    // This ensures balanced scraping across HR, Product, and IT domains
+    const domainKeywords = {
+      hr: new Set<string>(),
+      product: new Set<string>(),
+      it: new Set<string>()
+    };
+
     for (const user of users) {
-      // Use already-loaded profile data from user.profile
-      // No need to re-import - loadAllUsers() already loaded it!
+      // Detect user's domain (hr/product/it)
+      const domain = detectUserDomain(user.profile);
 
       // Add target roles as keywords
       for (const role of user.profile.target_roles) {
-        allKeywords.add(role);
+        domainKeywords[domain].add(role);
       }
 
       // Add primary skills as keywords
       if (user.profile.skills?.primary) {
         for (const skill of user.profile.skills.primary) {
-          allKeywords.add(skill);
+          domainKeywords[domain].add(skill);
         }
       }
     }
 
-    const searchKeywords = Array.from(allKeywords);
-    logger.info(`📊 Aggregated ${searchKeywords.length} unique keywords from ${users.length} users`);
-    logger.info(`🔍 Top keywords: ${searchKeywords.slice(0, 10).join(', ')}...`);
+    // Interleave keywords from each domain to ensure diversity in scraping
+    const searchKeywords: string[] = [];
+    const maxPerDomain = 40; // Balance: 40 keywords per domain
+
+    for (const domain of ['hr', 'product', 'it'] as const) {
+      const domainArray = Array.from(domainKeywords[domain]).slice(0, maxPerDomain);
+      searchKeywords.push(...domainArray);
+    }
+
+    logger.info(`📊 Keyword diversity by domain:`);
+    logger.info(`   HR: ${domainKeywords.hr.size} keywords`);
+    logger.info(`   Product: ${domainKeywords.product.size} keywords`);
+    logger.info(`   IT: ${domainKeywords.it.size} keywords`);
+    logger.info(`   Total: ${searchKeywords.length} keywords for scraping`);
+    logger.info(`🔍 Sample keywords: ${searchKeywords.slice(0, 10).join(', ')}...`);
+
+    /**
+     * Helper function to detect user's domain based on their target roles
+     */
+    function detectUserDomain(profile: any): 'hr' | 'product' | 'it' {
+      const rolesStr = profile.target_roles.join(' ').toLowerCase();
+
+      if (rolesStr.includes('hr') || rolesStr.includes('recruitment') ||
+          rolesStr.includes('human resources') || rolesStr.includes('payroll')) {
+        return 'hr';
+      }
+      if (rolesStr.includes('product') || rolesStr.includes('brand') ||
+          rolesStr.includes('marketing')) {
+        return 'product';
+      }
+      return 'it'; // Default to IT
+    }
 
     /**
      * Parallel scraper functions for concurrent execution

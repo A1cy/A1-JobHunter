@@ -73,10 +73,111 @@ export class KeywordJobMatcher {
   }
 
   /**
-   * Check if job title contains cross-domain keywords that conflict with profile
+   * STRICT DOMAIN WHITELIST: Job MUST contain domain-specific keywords to be considered
+   * This is the PRIMARY filter for 100% accuracy
+   * Returns true if job matches user's domain, false otherwise
    */
-  private hasCrossDomainConflict(jobTitle: string): boolean {
-    const titleLower = jobTitle.toLowerCase();
+  private matchesUserDomain(job: Job): boolean {
+    const titleLower = job.title.toLowerCase();
+    const descLower = (job.description || '').toLowerCase();
+    const combinedText = `${titleLower} ${descLower}`;
+
+    const targetRolesStr = this.profile.target_roles.join(' ').toLowerCase();
+
+    // Define STRICT domain-specific keywords (comprehensive lists for 100% accuracy)
+    const hrKeywords = [
+      // Roles
+      'hr specialist', 'hr generalist', 'hr officer', 'hr manager', 'hr director',
+      'human resources', 'recruitment', 'recruiter', 'talent acquisition',
+      'headhunter', 'sourcing', 'staffing', 'hiring',
+      'hris', 'hris analyst', 'hris specialist', 'hr systems',
+      'payroll', 'compensation', 'benefits', 'c&b',
+      'employee relations', 'organizational development', 'od specialist',
+      'learning and development', 'l&d', 'training', 'trainer',
+      'hr business partner', 'hrbp', 'hr consultant',
+      'onboarding', 'offboarding', 'hr compliance', 'hr coordinator',
+      // Saudi-specific
+      'qiwa', 'gosi', 'saudi labor law', 'saudization', 'nitaqat',
+      'mudad', 'mol', 'ministry of labor'
+    ];
+
+    const productKeywords = [
+      // Roles
+      'product manager', 'product owner', 'product specialist', 'product lead',
+      'brand manager', 'brand specialist', 'brand director',
+      'product marketing', 'product strategy', 'product analyst',
+      'business development', 'bd manager', 'business analyst',
+      'product consultant', 'product coordinator',
+      // Skills
+      'product management', 'product development', 'product lifecycle',
+      'brand strategy', 'brand development', 'branding',
+      'market research', 'marketing strategy', 'digital marketing',
+      'e-commerce', 'ecommerce', 'online retail',
+      'seo', 'ppc', 'sem', 'google ads', 'social media marketing',
+      'growth hacking', 'go-to-market', 'gtm',
+      'hubspot', 'google analytics', 'marketing automation'
+    ];
+
+    const itKeywords = [
+      // Roles
+      'software engineer', 'software developer', 'web developer', 'full stack',
+      'backend developer', 'frontend developer', 'devops engineer',
+      'ai engineer', 'ml engineer', 'machine learning', 'data scientist',
+      'genai', 'artificial intelligence', 'deep learning',
+      'digital transformation', 'transformation specialist', 'transformation manager',
+      'cloud engineer', 'cloud architect', 'solutions architect',
+      'mlops', 'data engineer', 'platform engineer',
+      // Technologies
+      'python', 'javascript', 'typescript', 'java', 'c++', 'golang', 'rust',
+      'react', 'angular', 'vue', 'node.js', 'django', 'flask', 'fastapi',
+      'tensorflow', 'pytorch', 'scikit-learn', 'langchain',
+      'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'k8s',
+      'git', 'ci/cd', 'jenkins', 'terraform'
+    ];
+
+    // Determine user's domain
+    let userDomain: 'hr' | 'product' | 'it' = 'it'; // default
+
+    if (targetRolesStr.includes('hr') || targetRolesStr.includes('recruitment') ||
+        targetRolesStr.includes('human resources') || targetRolesStr.includes('payroll')) {
+      userDomain = 'hr';
+    } else if (targetRolesStr.includes('product') || targetRolesStr.includes('brand') ||
+               targetRolesStr.includes('marketing')) {
+      userDomain = 'product';
+    }
+
+    // STRICT WHITELIST: Job MUST contain at least ONE domain keyword
+    let requiredKeywords: string[] = [];
+    switch (userDomain) {
+      case 'hr':
+        requiredKeywords = hrKeywords;
+        break;
+      case 'product':
+        requiredKeywords = productKeywords;
+        break;
+      case 'it':
+        requiredKeywords = itKeywords;
+        break;
+    }
+
+    // Check if job contains ANY of the required domain keywords
+    const hasMatch = requiredKeywords.some(keyword => combinedText.includes(keyword));
+
+    if (!hasMatch) {
+      logger.debug(`[Domain Whitelist] REJECTED: "${job.title}" - No ${userDomain} keywords found`);
+    }
+
+    return hasMatch;
+  }
+
+  /**
+   * Check if job contains cross-domain keywords that conflict with profile
+   * NOW CHECKS BOTH TITLE AND DESCRIPTION for maximum accuracy
+   */
+  private hasCrossDomainConflict(job: Job): boolean {
+    const titleLower = job.title.toLowerCase();
+    const descLower = (job.description || '').toLowerCase();
+    const combinedText = `${titleLower} ${descLower}`; // Check BOTH title and description
     const targetRolesStr = this.profile.target_roles.join(' ').toLowerCase();
 
     // Define domain-specific keywords (COMPREHENSIVE LIST - FIX FOR CROSS-DOMAIN FILTERING)
@@ -145,7 +246,8 @@ export class KeywordJobMatcher {
 
     // If profile is HR-focused but job has IT keywords → reject
     if (targetRolesStr.includes('hr') && !targetRolesStr.includes('software')) {
-      if (itKeywords.some(k => titleLower.includes(k))) {
+      if (itKeywords.some(k => combinedText.includes(k))) {  // ✅ Check BOTH title and description
+        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - HR profile getting IT job`);
         return true; // HR profile getting IT job
       }
     }
@@ -154,7 +256,8 @@ export class KeywordJobMatcher {
     if ((targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
          targetRolesStr.includes('ai') || targetRolesStr.includes('engineer')) &&
         !targetRolesStr.includes('hr')) {
-      if (hrKeywords.some(k => titleLower.includes(k))) {
+      if (hrKeywords.some(k => combinedText.includes(k))) {  // ✅ Check BOTH title and description
+        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - IT profile getting HR job`);
         return true; // IT profile getting HR job
       }
     }
@@ -163,8 +266,9 @@ export class KeywordJobMatcher {
     if ((targetRolesStr.includes('product') || targetRolesStr.includes('marketing') ||
          targetRolesStr.includes('brand')) &&
         !targetRolesStr.includes('software') && !targetRolesStr.includes('hr')) {
-      if (itKeywords.some(k => titleLower.includes(k)) ||
-          hrKeywords.some(k => titleLower.includes(k))) {
+      if (itKeywords.some(k => combinedText.includes(k)) ||  // ✅ Check BOTH title and description
+          hrKeywords.some(k => combinedText.includes(k))) {
+        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - Product/Marketing profile getting IT/HR job`);
         return true; // Marketing profile getting IT/HR job
       }
     }
@@ -188,8 +292,13 @@ export class KeywordJobMatcher {
     let score = 0;
     const reasons: string[] = [];
 
-    // 0. Cross-Domain Filter (FIRST CHECK)
-    if (this.hasCrossDomainConflict(job.title)) {
+    // 0A. STRICT DOMAIN WHITELIST (FIRST CHECK - PRIMARY FILTER FOR 100% ACCURACY)
+    if (!this.matchesUserDomain(job)) {
+      return { score: 0, matchReasons: ['Not in user domain (missing required HR/Product/IT keywords)'] };
+    }
+
+    // 0B. Cross-Domain Blacklist (SECOND CHECK - DOUBLE-CHECK FOR CONFLICTS)
+    if (this.hasCrossDomainConflict(job)) {  // ✅ Now passes full job object
       return { score: 0, matchReasons: ['Job domain does not match profile (IT/HR/Marketing conflict)'] };
     }
 
@@ -402,54 +511,10 @@ export class KeywordJobMatcher {
 }
 
 /**
- * Load user profile from config
+ * LEGACY FUNCTIONS REMOVED:
+ * - loadUserProfile() - Loaded from legacy config/a1_profile.json (single-user)
+ * - matchJobs() - Used single user profile instead of multi-user profiles
+ *
+ * Multi-user system now uses KeywordJobMatcher class directly with user-specific profiles
+ * See multi-user-matcher.ts for the current implementation
  */
-async function loadUserProfile(): Promise<UserProfile> {
-  const profilePath = resolve(process.cwd(), 'config/a1_profile.json');
-  const profileData = await readFile(profilePath, 'utf-8');
-  return JSON.parse(profileData);
-}
-
-/**
- * Main export: Match jobs using FREE keyword matching with smart guarantees
- */
-export async function matchJobs(jobs: Job[]): Promise<Job[]> {
-  logger.info(`🔍 Starting FREE keyword-based matching for ${jobs.length} jobs...`);
-
-  const profile = await loadUserProfile();
-  const matcher = new KeywordJobMatcher(profile);
-
-  const scoredJobs = matcher.scoreJobs(jobs);
-
-  // NEW: Smart threshold - ensure minimum results
-  const BASE_THRESHOLD = 45;  // Lowered from 55 to 45 (more lenient)
-  const MIN_RESULTS = 5;      // Always return at least 5 jobs if available
-  const MAX_RESULTS = 20;     // Cap at 20 to avoid overwhelming user
-
-  // Sort by score (highest first)
-  const sortedJobs = scoredJobs.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-  // Filter by threshold
-  let filteredJobs = sortedJobs.filter(job => (job.score || 0) >= BASE_THRESHOLD);
-
-  // Guarantee minimum results if we have enough jobs
-  if (filteredJobs.length < MIN_RESULTS && sortedJobs.length >= MIN_RESULTS) {
-    logger.warn(`Only ${filteredJobs.length} passed threshold, taking top ${MIN_RESULTS} jobs`);
-    filteredJobs = sortedJobs.slice(0, MIN_RESULTS);
-  }
-
-  // Cap at maximum to avoid overwhelming user
-  if (filteredJobs.length > MAX_RESULTS) {
-    logger.info(`Capping results at ${MAX_RESULTS} top matches`);
-    filteredJobs = filteredJobs.slice(0, MAX_RESULTS);
-  }
-
-  const avgScore = filteredJobs.length > 0
-    ? Math.round(filteredJobs.reduce((sum, job) => sum + (job.score || 0), 0) / filteredJobs.length)
-    : 0;
-
-  logger.info(`✅ Keyword matching complete: ${filteredJobs.length}/${jobs.length} jobs passed (≥${BASE_THRESHOLD}% or top ${MIN_RESULTS})`);
-  logger.info(`📊 Average match score: ${avgScore}%`);
-
-  return filteredJobs;
-}

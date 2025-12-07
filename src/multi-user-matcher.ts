@@ -118,26 +118,30 @@ function filterByUserThreshold(
   threshold: number,
   maxJobs: number
 ): Job[] {
-  const MIN_RESULTS = 5; // Always return at least 5 jobs if available
+  const ABSOLUTE_MIN_SCORE = 40; // STRICT: Never send jobs below 40% match
 
   // Sort by score (highest first)
   const sortedJobs = [...jobs].sort((a, b) => (b.score || 0) - (a.score || 0));
 
-  // Filter by threshold
+  // Apply user threshold first
   let filtered = sortedJobs.filter(job => (job.score || 0) >= threshold);
 
-  // Smart minimum guarantee
-  if (filtered.length < MIN_RESULTS && sortedJobs.length >= MIN_RESULTS) {
-    logger.debug(`Only ${filtered.length} passed threshold, taking top ${MIN_RESULTS}`);
-    filtered = sortedJobs.slice(0, MIN_RESULTS);
+  // Then apply absolute minimum as backup (safety net)
+  filtered = filtered.filter(job => (job.score || 0) >= ABSOLUTE_MIN_SCORE);
+
+  // If NO jobs meet criteria, send NOTHING (better than sending wrong jobs)
+  if (filtered.length === 0) {
+    logger.info(`No jobs meet quality threshold (${threshold}%) and minimum (${ABSOLUTE_MIN_SCORE}%) for this user - sending zero jobs`);
+    return [];
   }
 
-  // Cap at user's maximum
+  // Respect maxJobs limit
   if (filtered.length > maxJobs) {
-    logger.debug(`Capping results at ${maxJobs} jobs`);
+    logger.info(`Capping results at ${maxJobs} jobs (from ${filtered.length} qualified)`);
     filtered = filtered.slice(0, maxJobs);
   }
 
+  logger.info(`Threshold filter: ${filtered.length} jobs passed (threshold: ${threshold}%, min: ${ABSOLUTE_MIN_SCORE}%)`);
   return filtered;
 }
 
