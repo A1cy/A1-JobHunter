@@ -15,7 +15,7 @@ import { JoobleJobScraper } from './scrapers/jooble-scraper.js';
 import { JSearchJobScraper } from './scrapers/jsearch-scraper.js';
 import { SearchAPIJobScraper } from './scrapers/searchapi-scraper.js';
 import { matchJobsForAllUsers } from './multi-user-matcher.js';
-import { sendToAllUsers, sendErrorNotificationToAllUsers, setupCallbackHandlers } from './multi-user-telegram.js';
+import { sendToAllUsers, sendErrorNotificationToAllUsers } from './multi-user-telegram.js';
 import { logger, deduplicateJobs, Job, generateJobId } from './utils.js';
 import { createMonitor } from './monitoring.js';
 
@@ -49,27 +49,46 @@ async function main() {
   const startTime = Date.now();
   const monitor = createMonitor();
 
-  // Initialize Telegram bot with callback handlers
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (botToken) {
-    const bot = new Telegraf(botToken);
-    setupCallbackHandlers(bot);
-    bot.launch().then(() => {
-      logger.info('✅ Telegram bot initialized with callback handlers');
-    }).catch((error) => {
-      logger.warn('⚠️  Failed to launch Telegram bot:', error);
-    });
-
-    // Graceful shutdown
-    process.once('SIGINT', () => bot.stop('SIGINT'));
-    process.once('SIGTERM', () => bot.stop('SIGTERM'));
-  }
-
   logger.info('🚀 A1 Job Hunter starting...');
   logger.info(`Mode: ${process.env.MODE || 'adaptive'}`);
   logger.info(`Date: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })}`);
 
   try {
+    // Step 0: Load all user profiles to extract search keywords (MULTI-USER FIX)
+    logger.info('📋 Step 0: Loading user profiles for keyword extraction...');
+
+    const { loadAllUsers } = await import('./multi-user-matcher.js');
+    const users = await loadAllUsers();
+
+    if (users.length === 0) {
+      logger.error('❌ No enabled users found');
+      return;
+    }
+
+    // Extract unique keywords from all user profiles
+    const allKeywords = new Set<string>();
+    for (const user of users) {
+      // Dynamic import of user profile
+      const profilePath = `../users/${user.username}/profile.json`;
+      const { default: profile } = await import(profilePath, { assert: { type: 'json' } });
+
+      // Add target roles as keywords
+      for (const role of profile.target_roles) {
+        allKeywords.add(role);
+      }
+
+      // Add primary skills as keywords
+      if (profile.skills?.primary) {
+        for (const skill of profile.skills.primary) {
+          allKeywords.add(skill);
+        }
+      }
+    }
+
+    const searchKeywords = Array.from(allKeywords);
+    logger.info(`📊 Aggregated ${searchKeywords.length} unique keywords from ${users.length} users`);
+    logger.info(`🔍 Top keywords: ${searchKeywords.slice(0, 10).join(', ')}...`);
+
     // Step 1: Hybrid 4-Tier Job Scraping with FREE APIs
     logger.info('📡 Step 1: Hybrid job scraping (4-tier API approach)...');
 
@@ -80,14 +99,9 @@ async function main() {
     // ═══════════════════════════════════════════════════════════
     logger.info('📡 Tier 1: Jooble API (Primary Source)...');
 
-    const joobleKeywords = [
-      'Digital Transformation Specialist',
-      'AI Engineer',
-      'ML Engineer',
-      'GenAI Developer',
-      'Full Stack Developer',
-      'Software Engineer'
-    ];
+    // Use aggregated keywords from ALL users (top 12 to prevent API query length issues)
+    const joobleKeywords = searchKeywords.slice(0, 12);
+    logger.info(`📡 Scraping with keywords: ${joobleKeywords.join(', ')}`);
 
     const jooble = new JoobleJobScraper();
     const joobleJobs = await jooble.searchMultipleKeywords(joobleKeywords, 'Riyadh');
@@ -104,8 +118,11 @@ async function main() {
 
       try {
         const jsearch = new JSearchJobScraper();
+        // Use aggregated keywords from ALL users (top 10 for balanced query length)
+        const jsearchQuery = searchKeywords.slice(0, 10).join(' OR ');
+        logger.info(`🔍 JSearch query: ${jsearchQuery}`);
         const jsearchJobs = await jsearch.searchJobs(
-          'Software Engineer OR Full Stack OR AI Engineer OR Digital Transformation',
+          jsearchQuery,
           'Riyadh, Saudi Arabia'
         );
         jobs.push(...jsearchJobs);
@@ -307,6 +324,10 @@ async function main() {
 
     // Send summary to admin
     await monitor.sendSummary();
+
+    // Exit gracefully (prevents Telegram bot from hanging)
+    logger.info('👋 Exiting gracefully...');
+    process.exit(0);
 
   } catch (error) {
     logger.error('❌ Job hunt failed:', error);

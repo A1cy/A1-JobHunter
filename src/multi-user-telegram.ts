@@ -24,15 +24,9 @@ function formatJobMessage(job: Job): { text: string; keyboard: any } {
       ? `💡 ${job.matchReasons.slice(0, 2).join(' • ')}\n`
       : '');
 
-  // Inline buttons for tracking and applying
+  // Inline button for applying (callback buttons removed - don't work in GitHub Actions)
   const keyboard = Markup.inlineKeyboard([
-    [
-      Markup.button.url('🔗 Apply Now', job.url)
-    ],
-    [
-      Markup.button.callback('✅ Applied', `applied_${job.id}`),
-      Markup.button.callback('❌ Pass', `pass_${job.id}`)
-    ]
+    [Markup.button.url('🔗 Apply Now', job.url)]
   ]);
 
   return { text, keyboard };
@@ -226,66 +220,6 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
   await cache.save();
 
   logger.info(`✅ Telegram delivery complete for all users`);
-}
-
-/**
- * Setup callback handlers for inline button actions (Applied / Pass)
- */
-export function setupCallbackHandlers(bot: Telegraf): void {
-  const tracker = new ApplicationTracker();
-
-  // Handle "Applied" button
-  bot.action(/applied_(.+)/, async (ctx) => {
-    const jobId = ctx.match[1];
-    const userId = ctx.from.id.toString();
-
-    try {
-      // Track application
-      await tracker.trackAction(userId, jobId, 'applied');
-
-      // Acknowledge and update message
-      await ctx.answerCbQuery('✅ Marked as Applied');
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: [
-          [{ text: '✅ Applied', callback_data: 'applied_done' }]
-        ]
-      });
-
-      logger.info(`✅ User ${userId} applied to job ${jobId}`);
-    } catch (error) {
-      logger.error(`Failed to track application:`, error);
-      await ctx.answerCbQuery('❌ Error tracking application');
-    }
-  });
-
-  // Handle "Pass" button
-  bot.action(/pass_(.+)/, async (ctx) => {
-    const jobId = ctx.match[1];
-    const userId = ctx.from.id.toString();
-
-    try {
-      // Track pass action
-      await tracker.trackAction(userId, jobId, 'passed');
-
-      // Acknowledge and update message
-      await ctx.answerCbQuery('❌ Marked as Not Interested');
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: [
-          [{ text: '❌ Passed', callback_data: 'pass_done' }]
-        ]
-      });
-
-      logger.info(`❌ User ${userId} passed on job ${jobId}`);
-    } catch (error) {
-      logger.error(`Failed to track pass:`, error);
-      await ctx.answerCbQuery('❌ Error tracking action');
-    }
-  });
-
-  // Handle already actioned buttons (prevent re-clicking)
-  bot.action(['applied_done', 'pass_done'], async (ctx) => {
-    await ctx.answerCbQuery('Already tracked!');
-  });
 }
 
 /**
