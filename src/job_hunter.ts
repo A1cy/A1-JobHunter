@@ -102,8 +102,14 @@ async function main() {
       try {
         logger.info('🔍 [Google] Starting (TIER 1 - PRIMARY)...');
 
-        const GOOGLE_API_KEY = 'AIzaSyA503xWFUzBMjyR0eBN3CJmFFCp0-TQ6zc';
-        const GOOGLE_CX = 'a2c7c787efd284957';
+        const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+        const GOOGLE_CX = process.env.GOOGLE_CX;
+
+        if (!GOOGLE_API_KEY || !GOOGLE_CX) {
+          logger.warn('⚠️  [Google] API key or CX not configured, skipping Google Custom Search');
+          return [];
+        }
+
         const allJobs: Job[] = [];
 
         // Build search query from top 10 keywords
