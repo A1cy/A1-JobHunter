@@ -17,15 +17,21 @@ function sleep(ms: number): Promise<void> {
 function formatJobMessage(job: Job): { text: string; keyboard: any } {
   const scoreEmoji = (job.score || 0) >= 85 ? '🌟' : (job.score || 0) >= 70 ? '⭐' : '✅';
 
-  const text = `${scoreEmoji} *${job.title}* (${job.score || 0}%)\n` +
-    `🏢 ${job.company}\n` +
-    `📍 ${job.location}\n` +
+  // ✅ Enhanced message format (better readability, more match reasons)
+  const text = `*${job.title}*\n` +
+    `🏢 ${job.company} | 📍 ${job.location}\n` +
+    `📊 Match: ${job.score || 0}% ${scoreEmoji}\n` +
     (job.matchReasons && job.matchReasons.length > 0
-      ? `💡 ${job.matchReasons.slice(0, 2).join(' • ')}\n`
-      : '');
+      ? `\n💡 *Why this matches:*\n${job.matchReasons.slice(0, 3).map(r => `   • ${r}`).join('\n')}\n`
+      : '') +
+    `\n━━━━━━━━━━━━━━━━`;
 
-  // Inline button for applying (callback buttons removed - don't work in GitHub Actions)
+  // ✅ Interactive buttons for job tracking (Applied/Passed) + Apply Now
   const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback('✅ Applied', `applied_${job.id}`),
+      Markup.button.callback('❌ Passed', `passed_${job.id}`)
+    ],
     [Markup.button.url('🔗 Apply Now', job.url)]
   ]);
 

@@ -161,11 +161,23 @@ async function main() {
         // Benefits: Better domain distribution, more diverse results
         // API Usage: 3 queries × 4 pages = 12 requests/day (12% of 100 free quota)
 
-        // Expanded site filter (8+ job sites for wider coverage)
-        const siteFilter = ' (site:linkedin.com/jobs OR site:linkedin.com/in OR ' +
-                          'site:bayt.com OR site:indeed.sa OR site:naukrigulf.com OR ' +
-                          'site:glassdoor.com OR site:tanqeeb.com OR ' +
-                          'site:forasna.com OR site:akhtaboot.com)';
+        // 🌐 Comprehensive MENA job board coverage (15+ platforms)
+        // Tier 1: Primary platforms (always include)
+        const tier1 = 'site:linkedin.com/jobs OR site:bayt.com OR site:sa.indeed.com OR ' +
+                      'site:naukrigulf.com OR site:gulftalent.com';
+
+        // Tier 2: Secondary platforms (high quality)
+        const tier2 = 'site:tanqeeb.com OR site:glassdoor.com/Job OR site:forasna.com OR ' +
+                      'site:akhtaboot.com OR site:gulf.monster.com';
+
+        // Tier 3: Additional coverage
+        const tier3 = 'site:mihnati.com OR site:laimoon.com OR site:jobzella.com OR ' +
+                      'site:daleel-madani.org OR site:careerjet.com.sa';
+
+        const siteFilter = ` (${tier1} OR ${tier2} OR ${tier3})`;
+
+        // ✅ CRITICAL FIX: Removed site:linkedin.com/in (returns profiles NOT jobs!)
+        // ✅ ADDED: 15+ job platforms for maximum MENA coverage
         const locationFilter = ' Riyadh Saudi Arabia';
 
         // Prepare 3 domain-specific queries
@@ -200,7 +212,9 @@ async function main() {
           logger.info(`${domainQuery.color} [Google] Starting ${domainQuery.name} query...`);
 
           const searchQuery = domainQuery.keywords.join(' OR ');
-          const fullQuery = `${searchQuery}${locationFilter}${siteFilter}`;
+          // 🎯 Force job-related pages with explicit job keywords
+          const jobKeywords = ' (jobs OR hiring OR careers OR vacancy OR vacancies OR employment OR positions)';
+          const fullQuery = `${searchQuery}${jobKeywords}${locationFilter}${siteFilter}`;
 
           logger.info(`   Keywords: ${domainQuery.keywords.join(', ')}`);
 
@@ -230,7 +244,31 @@ async function main() {
 
               // Parse Google results into Job format
               for (const item of data.items) {
-                // Extract company and title from Google title
+                // 🛡️ TRIPLE-LAYER URL VALIDATION (Safety Net)
+
+                // VALIDATION LAYER 1: Skip LinkedIn profiles
+                if (item.link.includes('linkedin.com/in/')) {
+                  logger.warn(`   ⚠️  Skipping LinkedIn profile: ${item.title}`);
+                  continue;
+                }
+
+                // VALIDATION LAYER 2: Skip company/school/showcase pages
+                const nonJobPatterns = ['/company/', '/school/', '/showcase/', '/about', '/people', '/cmp/', '/Overview/'];
+                if (nonJobPatterns.some(pattern => item.link.includes(pattern))) {
+                  logger.warn(`   ⚠️  Skipping non-job page: ${item.title}`);
+                  continue;
+                }
+
+                // VALIDATION LAYER 3: Ensure job-related URL patterns (positive filter)
+                const jobUrlPatterns = ['/jobs/', '/job/', '/careers/', '/career/', '/vacancy', '/vacancies/', '/viewjob', '/job-listing/', '/jobdetails/'];
+                const hasJobPattern = jobUrlPatterns.some(pattern => item.link.toLowerCase().includes(pattern));
+
+                if (!hasJobPattern) {
+                  logger.warn(`   ⚠️  URL doesn't match job patterns: ${item.link}`);
+                  continue;
+                }
+
+                // ✅ PASSED ALL VALIDATIONS - Extract company and title
                 // Format: "Job Title - Company Name"
                 const titleParts = item.title.split(' - ');
                 const jobTitle = titleParts[0] || item.title;
