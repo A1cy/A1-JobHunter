@@ -56,6 +56,9 @@ jobs:
           JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
           OPENWEBNINJA_API_KEY: ${{ secrets.OPENWEBNINJA_API_KEY }}
           SEARCHAPI_KEY: ${{ secrets.SEARCHAPI_KEY }}
+          # Google Custom Search API (Tier 1 PRIMARY)
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CX: ${{ secrets.GOOGLE_CX }}
           # Legacy (kept for Tier 3 direct scraping if needed)
           SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}
           MODE: ${{ github.event.inputs.mode || github.event.client_payload.mode || 'adaptive' }}
