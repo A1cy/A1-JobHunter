@@ -161,16 +161,12 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
 
   for (const result of results) {
     try {
-      // 🚨 DEBUGGING: Temporarily disable cache filtering to diagnose if jobs are matching
-      // This helps us determine if the problem is:
-      // 1. Job cache marking jobs as duplicates (if users get jobs now)
-      // 2. Domain whitelist being too strict (if users still get 0 jobs)
-      const freshJobs = result.matched_jobs; // Skip cache for now
-      // const freshJobs = cache.filterRecentlyShown(
-      //   result.matched_jobs,
-      //   result.username,
-      //   3 // Don't show same job within 3 days
-      // );
+      // Filter out jobs shown to this user in last 3 days
+      const freshJobs = cache.filterRecentlyShown(
+        result.matched_jobs,
+        result.username,
+        3 // Don't show same job within 3 days
+      );
 
       const stats = cache.getFilterStats(result.matched_jobs, result.username, 3);
       logger.info(

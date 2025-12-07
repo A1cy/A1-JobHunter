@@ -95,13 +95,20 @@ async function main() {
       }
     }
 
-    // Interleave keywords from each domain to ensure diversity in scraping
+    // TRUE ROUND-ROBIN INTERLEAVING: hr1, product1, it1, hr2, product2, it2, ...
+    // This ensures balanced domain representation in Google search query
     const searchKeywords: string[] = [];
-    const maxPerDomain = 40; // Balance: 40 keywords per domain
 
-    for (const domain of ['hr', 'product', 'it'] as const) {
-      const domainArray = Array.from(domainKeywords[domain]).slice(0, maxPerDomain);
-      searchKeywords.push(...domainArray);
+    const hrArray = Array.from(domainKeywords.hr);
+    const productArray = Array.from(domainKeywords.product);
+    const itArray = Array.from(domainKeywords.it);
+
+    const maxLength = Math.max(hrArray.length, productArray.length, itArray.length);
+
+    for (let i = 0; i < maxLength; i++) {
+      if (i < hrArray.length) searchKeywords.push(hrArray[i]);
+      if (i < productArray.length) searchKeywords.push(productArray[i]);
+      if (i < itArray.length) searchKeywords.push(itArray[i]);
     }
 
     logger.info(`📊 Keyword diversity by domain:`);
@@ -149,13 +156,28 @@ async function main() {
 
         const allJobs: Job[] = [];
 
-        // Build search query from top 10 keywords
-        const searchQuery = keywords.slice(0, 10).join(' OR ');
+        // Build search query from top 30 keywords (10 per domain with true interleaving)
+        const searchQuery = keywords.slice(0, 30).join(' OR ');
         const siteFilter = ' site:linkedin.com/jobs OR site:bayt.com OR site:indeed.sa OR site:naukrigulf.com';
         const locationFilter = ' Riyadh Saudi Arabia';
         const fullQuery = `${searchQuery}${locationFilter}${siteFilter}`;
 
-        logger.info(`📝 [Google] Search query: ${fullQuery.substring(0, 150)}...`);
+        // Log query composition for transparency and debugging
+        logger.info(`📝 [Google] Query construction:`);
+        logger.info(`   Total keywords available: ${keywords.length}`);
+        logger.info(`   First 30 keywords used: ${keywords.slice(0, 30).join(', ')}`);
+
+        // Count domain representation in query (using hrArray, productArray, itArray from parent scope)
+        const first30 = keywords.slice(0, 30);
+        const hrCount = first30.filter(k => hrArray.includes(k)).length;
+        const productCount = first30.filter(k => productArray.includes(k)).length;
+        const itCount = first30.filter(k => itArray.includes(k)).length;
+
+        logger.info(`   Domain breakdown in query:`);
+        logger.info(`     HR keywords: ${hrCount}`);
+        logger.info(`     Product keywords: ${productCount}`);
+        logger.info(`     IT keywords: ${itCount}`);
+        logger.info(`   Full Google query: ${fullQuery.substring(0, 200)}...`);
         logger.info(`📄 [Google] Fetching up to 5 pages (50 results max)...`);
 
         // Fetch up to 5 pages (50 results) to stay within daily limit (100 req/day)
