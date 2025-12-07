@@ -224,25 +224,40 @@ export async function matchJobsForAllUsers(allJobs: Job[]): Promise<UserMatchRes
     const matcher = new KeywordJobMatcher(user.profile);
     const scoredJobs = matcher.scoreJobs(enhancedJobs);
 
-    // Count how many jobs scored > 0 (passed domain filtering)
-    const passedDomainFilter = scoredJobs.filter(j => (j.score || 0) > 0).length;
-    const rejectedByDomainFilter = scoredJobs.length - passedDomainFilter;
-    logger.info(`   ✅ Phase 5 Complete: ${passedDomainFilter} jobs passed domain filter`);
-    logger.info(`   ❌ Phase 5 Rejected: ${rejectedByDomainFilter} jobs failed domain filter`);
+    // Count how many jobs scored > 0 (passed all filtering)
+    const passedFiltering = scoredJobs.filter(j => (j.score || 0) > 0).length;
+    const rejectedByFiltering = scoredJobs.length - passedFiltering;
 
-    if (passedDomainFilter > 0 && passedDomainFilter <= 5) {
+    // Analyze rejection reasons for better logging
+    const titleMatchFailures = scoredJobs.filter(j =>
+      j.score === 0 && j.matchReasons?.[0]?.includes('Title does not match')
+    ).length;
+    const otherFailures = rejectedByFiltering - titleMatchFailures;
+
+    logger.info(`   ✅ Phase 5 Complete: ${passedFiltering} jobs passed all filters`);
+    if (rejectedByFiltering > 0) {
+      logger.info(`   ℹ️  Phase 5 Filtered: ${rejectedByFiltering} jobs (quality control)`);
+      if (titleMatchFailures > 0) {
+        logger.info(`      - Title mismatch: ${titleMatchFailures} jobs (prevents cross-contamination)`);
+      }
+      if (otherFailures > 0) {
+        logger.info(`      - Other reasons: ${otherFailures} jobs`);
+      }
+    }
+
+    if (passedFiltering > 0 && passedFiltering <= 5) {
       // Show sample of passed jobs
       const samplePassed = scoredJobs.filter(j => (j.score || 0) > 0).slice(0, 3);
-      logger.info(`   📋 Sample jobs that PASSED domain filter:`);
+      logger.info(`   📋 Sample jobs that PASSED filtering:`);
       samplePassed.forEach((job, i) => {
         logger.info(`      ${i + 1}. "${job.title}" - Score: ${job.score}%`);
       });
     }
 
-    if (rejectedByDomainFilter > 0 && rejectedByDomainFilter <= 10) {
+    if (rejectedByFiltering > 0 && rejectedByFiltering <= 10) {
       // Show sample of rejected jobs
       const sampleRejected = scoredJobs.filter(j => (j.score || 0) === 0).slice(0, 3);
-      logger.info(`   📋 Sample jobs that FAILED domain filter:`);
+      logger.info(`   📋 Sample jobs that were FILTERED OUT:`);
       sampleRejected.forEach((job, i) => {
         logger.info(`      ${i + 1}. "${job.title}" - Reason: ${job.matchReasons?.[0] || 'Unknown'}`);
       });
