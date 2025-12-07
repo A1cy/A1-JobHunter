@@ -42,22 +42,52 @@ async function sendPersonalizedJobs(
   const chatId = result.config.telegram_chat_id;
 
   try {
-    // Header message with user's name and personalized stats
-    const headerMessage = `🎯 *Job Hunter - ${result.profile.name}*\n` +
+    // 🔒 Privacy-first: Use first name only by default, full name if explicitly enabled
+    const displayName = result.config.message_options?.show_full_name
+      ? result.profile.name
+      : result.profile.name.split(' ')[0]; // Just first name
+
+    let headerMessage = `🎯 *Job Hunter - ${displayName}*\n` +
       `${new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         timeZone: 'Asia/Riyadh'
       })}\n\n` +
-      `Found *${result.matched_jobs.length} jobs* matching YOUR profile 🎉\n\n` +
-      `📊 *Your Match Summary:*\n` +
-      `• Total Jobs Scanned: ${result.stats.total_jobs_checked}\n` +
-      `• Jobs Matched: ${result.matched_jobs.length}\n` +
-      `• Average Match Score: ${result.stats.avg_score}%\n` +
-      `• High Match (≥85%): ${result.stats.high_match_count} jobs\n` +
-      `• Threshold: ≥${result.config.matching_threshold}%\n\n` +
-      `───────────────────────`;
+      `Found *${result.matched_jobs.length} jobs* matching YOUR profile 🎉\n\n`;
+
+    // Only show detailed stats if any are enabled
+    const showAnyStats = result.config.message_options?.show_total_scanned ||
+                         result.config.message_options?.show_avg_score ||
+                         result.config.message_options?.show_threshold ||
+                         result.config.message_options?.show_high_match_count !== false;
+
+    if (showAnyStats) {
+      headerMessage += `📊 *Your Match Summary:*\n`;
+
+      if (result.config.message_options?.show_total_scanned) {
+        headerMessage += `• Total Jobs Scanned: ${result.stats.total_jobs_checked}\n`;
+      }
+
+      // Jobs Matched always shown (core feature)
+      headerMessage += `• Jobs Matched: ${result.matched_jobs.length}\n`;
+
+      if (result.config.message_options?.show_avg_score) {
+        headerMessage += `• Average Match Score: ${result.stats.avg_score}%\n`;
+      }
+
+      if (result.config.message_options?.show_high_match_count !== false) {
+        headerMessage += `• High Match (≥85%): ${result.stats.high_match_count} jobs\n`;
+      }
+
+      if (result.config.message_options?.show_threshold) {
+        headerMessage += `• Threshold: ≥${result.config.matching_threshold}%\n`;
+      }
+
+      headerMessage += `\n`;
+    }
+
+    headerMessage += `───────────────────────`;
 
     await bot.telegram.sendMessage(chatId, headerMessage, {
       parse_mode: 'Markdown'
@@ -186,8 +216,12 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
           cache.markAsShown(job, result.username);
         }
       } else {
-        // Send "no new jobs" message
-        const noNewJobsMessage = `🔍 *Job Hunter - ${result.profile.name}*\n` +
+        // Send "no new jobs" message with privacy
+        const displayName = result.config.message_options?.show_full_name
+          ? result.profile.name
+          : result.profile.name.split(' ')[0];
+
+        const noNewJobsMessage = `🔍 *Job Hunter - ${displayName}*\n` +
           `${new Date().toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',

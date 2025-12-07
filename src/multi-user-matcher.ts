@@ -31,6 +31,15 @@ export interface UserConfig {
   email?: string;
   matching_threshold: number;
   max_jobs_per_day: number;
+
+  // 🔒 Privacy settings for Telegram messages
+  message_options?: {
+    show_full_name?: boolean;          // Default: false (first name only)
+    show_total_scanned?: boolean;      // Default: false (hide job hunting activity)
+    show_avg_score?: boolean;          // Default: false (hide personal preferences)
+    show_threshold?: boolean;          // Default: false (hide personal settings)
+    show_high_match_count?: boolean;   // Default: true (useful metric)
+  };
 }
 
 /**

@@ -156,92 +156,113 @@ async function main() {
 
         const allJobs: Job[] = [];
 
-        // Build search query from top 30 keywords (10 per domain with true interleaving)
-        const searchQuery = keywords.slice(0, 30).join(' OR ');
-        const siteFilter = ' site:linkedin.com/jobs OR site:bayt.com OR site:indeed.sa OR site:naukrigulf.com';
+        // 🚀 NEW STRATEGY: 3 domain-specific queries for better coverage
+        // Instead of 1 query with 30 mixed keywords, run 3 focused queries
+        // Benefits: Better domain distribution, more diverse results
+        // API Usage: 3 queries × 4 pages = 12 requests/day (12% of 100 free quota)
+
+        // Expanded site filter (8+ job sites for wider coverage)
+        const siteFilter = ' (site:linkedin.com/jobs OR site:linkedin.com/in OR ' +
+                          'site:bayt.com OR site:indeed.sa OR site:naukrigulf.com OR ' +
+                          'site:glassdoor.com OR site:tanqeeb.com OR ' +
+                          'site:forasna.com OR site:akhtaboot.com)';
         const locationFilter = ' Riyadh Saudi Arabia';
-        const fullQuery = `${searchQuery}${locationFilter}${siteFilter}`;
 
-        // Log query composition for transparency and debugging
-        logger.info(`📝 [Google] Query construction:`);
-        logger.info(`   Total keywords available: ${keywords.length}`);
-        logger.info(`   First 30 keywords used: ${keywords.slice(0, 30).join(', ')}`);
-
-        // Count domain representation in query (using hrArray, productArray, itArray from parent scope)
-        const first30 = keywords.slice(0, 30);
-        const hrCount = first30.filter(k => hrArray.includes(k)).length;
-        const productCount = first30.filter(k => productArray.includes(k)).length;
-        const itCount = first30.filter(k => itArray.includes(k)).length;
-
-        logger.info(`   Domain breakdown in query:`);
-        logger.info(`     HR keywords: ${hrCount}`);
-        logger.info(`     Product keywords: ${productCount}`);
-        logger.info(`     IT keywords: ${itCount}`);
-        logger.info(`   Full Google query: ${fullQuery.substring(0, 200)}...`);
-        logger.info(`📄 [Google] Fetching up to 5 pages (50 results max)...`);
-
-        // Fetch up to 5 pages (50 results) to stay within daily limit (100 req/day)
-        for (let page = 0; page < 5; page++) {
-          const startIndex = page * 10 + 1; // 1, 11, 21, 31, 41
-
-          logger.info(`📄 [Google] Fetching page ${page + 1} (startIndex: ${startIndex})...`);
-
-          const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(fullQuery)}&start=${startIndex}`;
-
-          try {
-            const response = await got(url, {
-              timeout: { request: 10000 },
-              responseType: 'json'
-            });
-
-            const data = response.body as any;
-
-            logger.info(`📦 [Google] Page ${page + 1} - Response received, items: ${data.items?.length || 0}`);
-
-            if (!data.items || data.items.length === 0) {
-              logger.info(`⚠️  [Google] Page ${page + 1} - No more results, stopping pagination`);
-              break; // No more results
-            }
-
-            // Log first result for debugging
-            if (page === 0 && data.items.length > 0) {
-              logger.info(`📋 [Google] Sample result - Title: "${data.items[0].title}"`);
-              logger.info(`📋 [Google] Sample result - Link: ${data.items[0].link}`);
-              logger.info(`📋 [Google] Sample result - Snippet: ${data.items[0].snippet?.substring(0, 100)}...`);
-            }
-
-            // Parse Google results into Job format
-            for (const item of data.items) {
-              // Extract company and title from Google title
-              // Format: "Job Title - Company Name"
-              const titleParts = item.title.split(' - ');
-              const jobTitle = titleParts[0] || item.title;
-              const company = titleParts.slice(1).join(' - ') || 'Unknown';
-
-              allJobs.push({
-                id: generateJobId(),
-                title: jobTitle.trim(),
-                company: company.trim(),
-                location: 'Riyadh, Saudi Arabia',
-                url: item.link,
-                description: (item.snippet || '').trim(),
-                platform: 'Google',
-                source: 'Google Custom Search API'
-              });
-            }
-
-            logger.info(`✅ [Google] Page ${page + 1} - Parsed ${data.items.length} jobs (total so far: ${allJobs.length})`);
-
-            // Rate limit: 1 request per second
-            await new Promise(r => setTimeout(r, 1000));
-
-          } catch (pageError: any) {
-            logger.error(`❌ [Google] Page ${page + 1} failed:`, pageError.message || pageError);
-            if (pageError.response) {
-              logger.error(`❌ [Google] API Response: ${JSON.stringify(pageError.response.body).substring(0, 200)}`);
-            }
-            break; // Stop pagination on error
+        // Prepare 3 domain-specific queries
+        const domainQueries = [
+          {
+            name: 'HR',
+            keywords: hrArray.slice(0, 10),
+            color: '👔'
+          },
+          {
+            name: 'Product',
+            keywords: productArray.slice(0, 10),
+            color: '📦'
+          },
+          {
+            name: 'IT',
+            keywords: itArray.slice(0, 10),
+            color: '💻'
           }
+        ];
+
+        logger.info(`📝 [Google] Optimized 3-query strategy:`);
+        logger.info(`   Total keywords available: ${keywords.length}`);
+        logger.info(`   HR Query: ${domainQueries[0].keywords.length} keywords`);
+        logger.info(`   Product Query: ${domainQueries[1].keywords.length} keywords`);
+        logger.info(`   IT Query: ${domainQueries[2].keywords.length} keywords`);
+        logger.info(`   Site filter: 9 job platforms`);
+        logger.info(`   Expected API usage: 12 requests/day (12% of free quota)\n`);
+
+        // Execute 3 domain-specific queries
+        for (const domainQuery of domainQueries) {
+          logger.info(`${domainQuery.color} [Google] Starting ${domainQuery.name} query...`);
+
+          const searchQuery = domainQuery.keywords.join(' OR ');
+          const fullQuery = `${searchQuery}${locationFilter}${siteFilter}`;
+
+          logger.info(`   Keywords: ${domainQuery.keywords.join(', ')}`);
+
+          // Fetch 4 pages per domain (40 results per domain)
+          // Total: 3 domains × 4 pages = 12 requests/day
+          for (let page = 0; page < 4; page++) {
+            const startIndex = page * 10 + 1; // 1, 11, 21, 31
+
+            logger.info(`   📄 Page ${page + 1}/4 (startIndex: ${startIndex})...`);
+
+            const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(fullQuery)}&start=${startIndex}`;
+
+            try {
+              const response = await got(url, {
+                timeout: { request: 10000 },
+                responseType: 'json'
+              });
+
+              const data = response.body as any;
+
+              logger.info(`   📦 Response: ${data.items?.length || 0} items`);
+
+              if (!data.items || data.items.length === 0) {
+                logger.info(`   ⚠️  No more results for ${domainQuery.name}, stopping pagination`);
+                break; // No more results
+              }
+
+              // Parse Google results into Job format
+              for (const item of data.items) {
+                // Extract company and title from Google title
+                // Format: "Job Title - Company Name"
+                const titleParts = item.title.split(' - ');
+                const jobTitle = titleParts[0] || item.title;
+                const company = titleParts.slice(1).join(' - ') || 'Unknown';
+
+                allJobs.push({
+                  id: generateJobId(),
+                  title: jobTitle.trim(),
+                  company: company.trim(),
+                  location: 'Riyadh, Saudi Arabia',
+                  url: item.link,
+                  description: (item.snippet || '').trim(),
+                  platform: 'Google',
+                  source: `Google Custom Search API (${domainQuery.name})`
+                });
+              }
+
+              logger.info(`   ✅ Parsed ${data.items.length} ${domainQuery.name} jobs (total: ${allJobs.length})`);
+
+              // Rate limit: 1 request per second
+              await new Promise(r => setTimeout(r, 1000));
+
+            } catch (pageError: any) {
+              logger.error(`   ❌ Page ${page + 1} failed:`, pageError.message || pageError);
+              if (pageError.response) {
+                logger.error(`   ❌ API Response: ${JSON.stringify(pageError.response.body).substring(0, 200)}`);
+              }
+              break; // Stop pagination on error
+            }
+          }
+
+          logger.info(`   ✅ ${domainQuery.name} query complete: ${allJobs.filter(j => j.source?.includes(domainQuery.name)).length} jobs\n`);
         }
 
         logger.info(`✅ [Google] TOTAL JOBS SCRAPED: ${allJobs.length} jobs`);
@@ -440,21 +461,21 @@ async function main() {
 
     let jobs: Job[] = [];
 
-    logger.info('\n🚀 Launching all scrapers in parallel...\n');
+    logger.info('\n🚀 Launching Google Custom Search (other scrapers temporarily disabled)...\n');
 
-    // Execute all scrapers concurrently (ALL ENABLED - stays within Google free tier)
+    // 🎯 FOCUS: Google Custom Search ONLY (user request: "disable the other api scrapper")
+    // Strategy: Perfect Google search first, then re-enable other scrapers later
     // Google API usage: 5 requests/day (5% of 100 free quota)
-    // Other scrapers use their own APIs/scraping (0 Google API calls)
     const scraperResults = await Promise.allSettled([
-      scrapeGoogle(searchKeywords),      // Tier 1 - PRIMARY (Google Custom Search) ✅
-      scrapeJooble(searchKeywords),       // Tier 2 - FREE API ✅
-      scrapeJSearch(searchKeywords),      // Tier 3 - FREE API ✅
-      scrapeBayt(searchKeywords),         // Tier 4 - Web Scraping ✅
-      scrapeIndeed(searchKeywords),       // Tier 5 - Web Scraping ✅
-      scrapeRSS(searchKeywords),          // Tier 6 - RSS Feeds ✅
-      loadWebSearchData(),                // Tier 7 - Pregenerated Data ✅
-      scrapeSearchAPI(searchKeywords),    // Tier 8 - FREE API ✅
-      scrapeLinkedIn(searchKeywords)      // Tier 9 - Stealth Scraping ✅
+      scrapeGoogle(searchKeywords),      // Tier 1 - PRIMARY (Google Custom Search) ✅ ACTIVE
+      // scrapeJooble(searchKeywords),       // Tier 2 - FREE API ❌ Disabled (user wants Google focus)
+      // scrapeJSearch(searchKeywords),      // Tier 3 - FREE API ❌ Disabled
+      // scrapeBayt(searchKeywords),         // Tier 4 - Web Scraping ❌ Disabled
+      // scrapeIndeed(searchKeywords),       // Tier 5 - Web Scraping ❌ Disabled
+      // scrapeRSS(searchKeywords),          // Tier 6 - RSS Feeds ❌ Disabled
+      // loadWebSearchData(),                // Tier 7 - Pregenerated Data ❌ Disabled
+      // scrapeSearchAPI(searchKeywords),    // Tier 8 - FREE API ❌ Disabled
+      // scrapeLinkedIn(searchKeywords)      // Tier 9 - Stealth Scraping ❌ Disabled
     ]);
 
     // Collect jobs from all successful scrapers

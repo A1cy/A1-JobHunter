@@ -4,5 +4,12 @@
   "name": "Saud",
   "email": "Y5.6@hotmail.com",
   "matching_threshold": 50,
-  "max_jobs_per_day": 15
+  "max_jobs_per_day": 15,
+  "message_options": {
+    "show_full_name": false,
+    "show_total_scanned": false,
+    "show_avg_score": false,
+    "show_threshold": false,
+    "show_high_match_count": true
+  }
 }

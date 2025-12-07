@@ -4,5 +4,12 @@
   "name": "Hadi",
   "email": "alhadi@a1xai.com",
   "matching_threshold": 45,
-  "max_jobs_per_day": 20
+  "max_jobs_per_day": 20,
+  "message_options": {
+    "show_full_name": false,
+    "show_total_scanned": false,
+    "show_avg_score": false,
+    "show_threshold": false,
+    "show_high_match_count": true
+  }
 }
