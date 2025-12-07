@@ -287,17 +287,23 @@ async function main() {
                 const jobTitle = titleParts[0] || item.title;
                 const company = titleParts.slice(1).join(' - ') || 'Unknown';
 
-                // VALIDATION LAYER 4: ✅ FIX #4 - Skip generic career pages by title
+                // VALIDATION LAYER 4: ✅ QUALITY FIX #5 - Skip generic career pages by title
                 const genericTitles = [
                   'careers', 'job search', 'search opportunities', 'current opportunities',
                   'job openings', 'work with us', 'join our team', 'employment opportunities',
-                  'view all jobs', 'all jobs', 'open positions', 'career opportunities'
+                  'view all jobs', 'all jobs', 'open positions', 'career opportunities',
+                  // ✅ QUALITY FIX #5: Additional generic patterns
+                  'job opportunities', 'engineering jobs', 'technology jobs',
+                  'jobs listing', 'career page', 'vacancies', 'hiring',
+                  'opportunities :', ': jobs', 'jobs -', '- jobs'
                 ];
                 const titleLower = jobTitle.toLowerCase();
                 const isGenericPage = genericTitles.some(generic =>
                   titleLower === generic ||
                   titleLower.includes(`${generic} |`) ||
-                  titleLower.startsWith(generic)
+                  titleLower.startsWith(generic) ||
+                  titleLower.endsWith(generic) || // ✅ NEW: catch "... - Jobs"
+                  titleLower.includes(` ${generic}`) // ✅ NEW: catch "... Job Opportunities ..."
                 );
 
                 if (isGenericPage) {

@@ -156,11 +156,23 @@ export class KeywordJobMatcher {
 
       // Platform and operations
       'platform engineer', 'sre', 'site reliability', 'operations engineer',
-      'kubernetes', 'docker', 'containerization'
+      'kubernetes', 'docker', 'containerization',
+
+      // ✅ QUALITY FIX #2: MLOps and DevOps keywords (prevent Marketing Operations → MLOps)
+      'mlops', 'ml ops', 'machine learning ops', 'machine learning operations',
+      'devops engineer', 'sre engineer', 'platform ops'
     ];
 
     const hrKeywords = ['hr specialist', 'hr generalist', 'hr officer', 'recruitment',
                        'payroll', 'hris', 'employee relations', 'hr business partner'];
+
+    // ✅ QUALITY FIX #2: Marketing keywords (prevent Marketing → IT/ML matches)
+    const marketingKeywords = [
+      'marketing manager', 'marketing operations', 'marketing specialist',
+      'brand manager', 'product marketing', 'digital marketing',
+      'content marketing', 'marketing automation', 'campaign manager',
+      'marketing director', 'marketing coordinator'
+    ];
 
     // If profile is HR-focused but job has IT keywords → reject
     if (targetRolesStr.includes('hr') && !targetRolesStr.includes('software')) {
@@ -191,6 +203,17 @@ export class KeywordJobMatcher {
       }
     }
 
+    // ✅ QUALITY FIX #2: If profile is IT/ML-focused but job has Marketing keywords → reject
+    if ((targetRolesStr.includes('mlops') || targetRolesStr.includes('ai') ||
+         targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
+         targetRolesStr.includes('engineer')) &&
+        !targetRolesStr.includes('marketing') && !targetRolesStr.includes('product')) {
+      if (marketingKeywords.some(k => combinedText.includes(k))) {
+        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - ML/IT profile getting Marketing job`);
+        return true; // IT/ML profile getting Marketing job
+      }
+    }
+
     return false; // No conflict
   }
 
@@ -215,12 +238,12 @@ export class KeywordJobMatcher {
       return { score: 0, matchReasons: ['Not in user domain (missing required HR/Product/IT keywords)'] };
     }
 
-    // 0B. ✅ REMOVED: Cross-Domain Blacklist (user request - Fix #1)
-    // User insight: "no need for filtring ! since the searching now done using each user targted postion"
-    // Impact: This was rejecting 26-28 jobs per user (90% of results in Run #29)
-    // if (this.hasCrossDomainConflict(job)) {
-    //   return { score: 0, matchReasons: ['Job domain does not match profile (IT/HR/Marketing conflict)'] };
-    // }
+    // 0B. ✅ QUALITY FIX #1: RE-ENABLED Cross-Domain Blacklist
+    // Run #32 showed bad matches: "Marketing Operations" (52%) → "MLOps Engineer"
+    // This prevents Marketing→IT, HR→IT, IT→Marketing contamination
+    if (this.hasCrossDomainConflict(job)) {
+      return { score: 0, matchReasons: ['Job domain conflicts with your profile (IT/HR/Marketing mismatch)'] };
+    }
 
     // 1. Title Match (40 points max) - MANDATORY FILTER
     const titleResult = this.scoreTitleMatch(job.title);
