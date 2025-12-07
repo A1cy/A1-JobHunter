@@ -197,14 +197,15 @@ export async function sendToAllUsers(results: UserMatchResult[]): Promise<void> 
 
   for (const result of results) {
     try {
-      // Filter out jobs shown to this user in last 3 days
+      // Filter out jobs shown to this user in last 1 day
+      // ✅ TIER 1 FIX #1: Reduced from 3 to 1 day for small job pools
       const freshJobs = cache.filterRecentlyShown(
         result.matched_jobs,
         result.username,
-        3 // Don't show same job within 3 days
+        1 // Don't show same job within 1 day (allows jobs to repeat next day)
       );
 
-      const stats = cache.getFilterStats(result.matched_jobs, result.username, 3);
+      const stats = cache.getFilterStats(result.matched_jobs, result.username, 1);
       logger.info(
         `📊 ${result.username}: ${stats.total} matched → ` +
         `${stats.fresh} fresh (filtered ${stats.duplicates} duplicates)`

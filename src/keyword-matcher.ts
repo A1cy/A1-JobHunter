@@ -226,15 +226,13 @@ export class KeywordJobMatcher {
     const titleResult = this.scoreTitleMatch(job.title);
     score += titleResult.score;
 
-    // 🚨 MANDATORY: Reject jobs with poor title match (<37.5% = <15 points)
-    // This prevents cross-domain contamination (HR getting IT jobs, etc.)
-    // Requires at least 40%+ word match ratio between job title and target roles
-    // ✅ LOWERED from 25 to 15 (from 60% to 40% match) - Option B compromise
-    const MIN_TITLE_SCORE = 15; // 37.5% of 40 points (allows more partial matches)
-    if (titleResult.score < MIN_TITLE_SCORE) {
-      // Job title doesn't match any target role - reject immediately
-      return { score: 0, matchReasons: ['Title does not match any target role'] };
-    }
+    // ✅ TIER 1 FIX #2: REMOVED title match rejection filter
+    // User explicitly requested: "no need for filtering! queries already personalized"
+    // Title scoring still contributes 0-40 points to total score
+    // But won't auto-reject jobs anymore - let threshold handle filtering
+    //
+    // Previous: MIN_TITLE_SCORE = 15 (40% match required)
+    // Now: Title match used for scoring only, not rejection
 
     if (titleResult.matchedRole) {
       reasons.push(`Role matches ${titleResult.matchedRole}`);
