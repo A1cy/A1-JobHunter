@@ -203,14 +203,27 @@ export class KeywordJobMatcher {
       }
     }
 
-    // ✅ QUALITY FIX #2: If profile is IT/ML-focused but job has Marketing keywords → reject
+    // ✅ RUN #34 FIX: Relaxed filter - check TITLE ONLY (not description) + allow Digital Transformation jobs
+    // Block if: IT/ML profile + Marketing title + NOT a transformation job
     if ((targetRolesStr.includes('mlops') || targetRolesStr.includes('ai') ||
          targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
          targetRolesStr.includes('engineer')) &&
         !targetRolesStr.includes('marketing') && !targetRolesStr.includes('product')) {
-      if (marketingKeywords.some(k => combinedText.includes(k))) {
-        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - ML/IT profile getting Marketing job`);
-        return true; // IT/ML profile getting Marketing job
+
+      // Check if job title has marketing keywords
+      if (marketingKeywords.some(k => titleLower.includes(k))) {
+        // ✅ EXCEPTION: Allow if job title ALSO contains transformation/digital keywords
+        const isTransformationJob = titleLower.includes('transformation') ||
+                                    titleLower.includes('digital') ||
+                                    titleLower.includes('innovation') ||
+                                    titleLower.includes('strategy');
+
+        if (!isTransformationJob) {
+          logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - ML/IT profile getting Marketing job`);
+          return true; // Block: IT/ML profile getting pure Marketing job
+        } else {
+          logger.debug(`[Cross-Domain Blacklist] ALLOWED: "${job.title}" - Marketing + Transformation/Digital job for IT/ML profile`);
+        }
       }
     }
 

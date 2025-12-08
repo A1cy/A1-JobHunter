@@ -127,7 +127,7 @@ function filterByUserThreshold(
   threshold: number,
   maxJobs: number
 ): Job[] {
-  const ABSOLUTE_MIN_SCORE = 60; // ✅ QUALITY FIX #4: Raised from 40% to 60% (quality over quantity)
+  const ABSOLUTE_MIN_SCORE = 50; // ✅ RUN #34 FIX: Balanced threshold (50% - blocks truly irrelevant only)
 
   // Sort by score (highest first)
   const sortedJobs = [...jobs].sort((a, b) => (b.score || 0) - (a.score || 0));

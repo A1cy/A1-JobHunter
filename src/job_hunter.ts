@@ -161,7 +161,7 @@ async function main() {
         // Benefits: Better domain distribution, more diverse results
         // API Usage: 3 queries × 4 pages = 12 requests/day (12% of 100 free quota)
 
-        // 🌐 Comprehensive MENA job board coverage (15+ platforms)
+        // 🌐 RUN #34: EXPANDED to 30+ MENA platforms (from 15) for maximum coverage
         // Tier 1: Primary platforms (always include)
         const tier1 = 'site:linkedin.com/jobs OR site:bayt.com OR site:sa.indeed.com OR ' +
                       'site:naukrigulf.com OR site:gulftalent.com';
@@ -174,7 +174,19 @@ async function main() {
         const tier3 = 'site:mihnati.com OR site:laimoon.com OR site:jobzella.com OR ' +
                       'site:daleel-madani.org OR site:careerjet.com.sa';
 
-        const siteFilter = ` (${tier1} OR ${tier2} OR ${tier3})`;
+        // ✅ NEW Tier 4: Regional platforms (Egypt, UAE, Pakistan)
+        const tier4 = 'site:wuzzuf.net OR site:dubizzle.com/jobs OR site:mubasher.com OR ' +
+                      'site:rozee.pk OR site:careers-dubai.com';
+
+        // ✅ NEW Tier 5: Major Saudi company career pages (direct postings)
+        const tier5 = 'site:careers.almarai.com OR site:careers.stc.com.sa OR site:careers.sabic.com OR ' +
+                      'site:careers.aramco.com OR site:careers.mobily.com.sa';
+
+        // ✅ NEW Tier 6: Specialized Saudi platforms
+        const tier6 = 'site:jobs.kfupm.edu.sa OR site:riyadhcareers.com OR site:saudijobs.net OR ' +
+                      'site:gulfcareer.com OR site:daleelmadani.org';
+
+        const siteFilter = ` (${tier1} OR ${tier2} OR ${tier3} OR ${tier4} OR ${tier5} OR ${tier6})`;
 
         // ✅ CRITICAL FIX: Removed site:linkedin.com/in (returns profiles NOT jobs!)
         // ✅ ADDED: 15+ job platforms for maximum MENA coverage
