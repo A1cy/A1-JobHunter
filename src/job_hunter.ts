@@ -236,13 +236,13 @@ async function main() {
 
           logger.info(`   Keywords: ${domainQuery.keywords.join(', ')}`);
 
-          // ✅ TIER 2 FIX #4: Fetch 8 pages per domain (80 results per domain)
-          // Total: 3 domains × 8 pages = 24 requests/day (still within 100/day free tier)
-          // Expected: 33 → 55-65 unique jobs (+66-97%)
-          for (let page = 0; page < 8; page++) {
+          // ✅ RUN #35 QUOTA FIX: Reduced to 3 pages to allow more runs per day
+          // Total: 3 domains × 3 pages = 9 requests/day (allows 11 runs/day)
+          // Trade-off: Fewer jobs per run, but more reliable (avoid 429 errors)
+          for (let page = 0; page < 3; page++) {
             const startIndex = page * 10 + 1; // 1, 11, 21, 31, 41, 51, 61, 71
 
-            logger.info(`   📄 Page ${page + 1}/8 (startIndex: ${startIndex})...`);
+            logger.info(`   📄 Page ${page + 1}/3 (startIndex: ${startIndex})...`);
 
             const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(fullQuery)}&start=${startIndex}`;
 
