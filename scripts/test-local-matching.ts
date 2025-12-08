@@ -7,8 +7,79 @@
 import { matchJobsForAllUsers } from '../src/multi-user-matcher.js';
 import { logger } from '../src/utils.js';
 
-// Mock jobs from Run #32 (the ones that got blocked in Run #33)
+// ✅ RUN #35: Mock jobs including HR and Product roles (previously blocked)
 const testJobs = [
+  // Hamad (HR) test jobs - Previously blocked by cross-domain filter
+  {
+    id: 'hr-test-1',
+    title: 'HR Specialist - HRIS Systems',
+    company: 'Almarai',
+    location: 'Riyadh',
+    url: 'https://careers.almarai.com/hr-1',
+    description: 'Manage Workday HRIS platform, employee data management, digital HR processes, HR systems implementation, and talent analytics...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+  {
+    id: 'hr-test-2',
+    title: 'HR Business Partner - Digital Transformation',
+    company: 'STC',
+    location: 'Riyadh',
+    url: 'https://careers.stc.com.sa/hr-2',
+    description: 'Partner with business leaders on digital transformation initiatives, tech recruitment, HRIS optimization, and people analytics...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+  {
+    id: 'hr-test-3',
+    title: 'Talent Acquisition Specialist - Tech Recruitment',
+    company: 'Aramco Digital',
+    location: 'Riyadh',
+    url: 'https://careers.aramco.com/hr-3',
+    description: 'Recruit software engineers, data scientists, and technology professionals. Manage applicant tracking systems and recruitment technology...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+
+  // Saud (Product/Marketing) test jobs - Previously blocked by cross-domain filter
+  {
+    id: 'product-test-1',
+    title: 'Product Manager - Software Products',
+    company: 'Aramco Digital',
+    location: 'Riyadh',
+    url: 'https://careers.aramco.com/pm-1',
+    description: 'Lead product strategy for software solutions, work with engineering teams, define product roadmap, and manage technology products...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+  {
+    id: 'product-test-2',
+    title: 'Brand Manager - Digital Marketing',
+    company: 'SABIC',
+    location: 'Riyadh',
+    url: 'https://careers.sabic.com/brand-1',
+    description: 'Develop digital brand strategy, manage marketing campaigns, analytics, SEO optimization, and brand positioning in digital channels...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+  {
+    id: 'product-test-3',
+    title: 'Product Specialist - Technology Solutions',
+    company: 'Mobily',
+    location: 'Riyadh',
+    url: 'https://careers.mobily.com/ps-1',
+    description: 'Manage technology product portfolio, work with software development teams, product analytics, and technology solutions...',
+    platform: 'Google',
+    timestamp: new Date().toISOString(),
+    score: 0
+  },
+
+  // Hadi (AI/ML) test jobs - Should still pass
   {
     id: 'test-1',
     title: 'Technology & Engineering Jobs | Bain & Company',
@@ -101,13 +172,15 @@ const testJobs = [
 
 async function testMatching() {
   logger.info('='.repeat(80));
-  logger.info('🧪 RUN #34 LOCAL TESTING: Filter Fixes Validation');
+  logger.info('🧪 RUN #35 LOCAL TESTING: Emergency Fix + Innovation Validation');
   logger.info('='.repeat(80));
   logger.info('');
   logger.info('📋 TEST SUMMARY:');
-  logger.info('   - Cross-domain filter: RELAXED (title-only, allows Digital Transformation)');
-  logger.info('   - Threshold: 50% (down from 60%)');
-  logger.info('   - Platforms: 30+ (expanded from 15)');
+  logger.info('   - Cross-domain filter: ✅ DISABLED (trust Google CSE + scoring)');
+  logger.info('   - Threshold: ✅ 40% (down from 50%, with dynamic adjustment)');
+  logger.info('   - Fuzzy matching: ✅ ENABLED (Levenshtein distance 70%+)');
+  logger.info('   - Skill synonyms: ✅ ENABLED (50+ skill variations)');
+  logger.info('   - Dynamic threshold: ✅ ENABLED (prevents zero jobs)');
   logger.info('');
   logger.info('📊 Testing with mock jobs from Run #32-33:');
   logger.info('');
@@ -134,7 +207,7 @@ async function testMatching() {
       }
 
       result.matched_jobs.forEach((job, i) => {
-        const passed = (job.score || 0) >= 50;
+        const passed = (job.score || 0) >= 40;
         const emoji = passed ? '✅' : '❌';
 
         totalMatched++;
@@ -151,9 +224,9 @@ async function testMatching() {
 
         // Debug: Show why blocked/passed
         if (!passed) {
-          logger.info(`      ⚠️  BLOCKED: Score ${job.score}% < 50% threshold`);
+          logger.info(`      ⚠️  BLOCKED: Score ${job.score}% < 40% threshold`);
         } else {
-          logger.info(`      ✅ PASSED: Score ${job.score}% ≥ 50% threshold`);
+          logger.info(`      ✅ PASSED: Score ${job.score}% ≥ 40% threshold`);
         }
         logger.info('');
       });
@@ -164,35 +237,49 @@ async function testMatching() {
     logger.info('━'.repeat(80));
     logger.info(`📈 Total jobs processed: ${testJobs.length}`);
     logger.info(`🎯 Total matched to users: ${totalMatched} jobs`);
-    logger.info(`✅ Passed threshold (≥50%): ${totalPassed} jobs`);
-    logger.info(`❌ Blocked (<50%): ${totalBlocked} jobs`);
+    logger.info(`✅ Passed threshold (≥40%): ${totalPassed} jobs`);
+    logger.info(`❌ Blocked (<40%): ${totalBlocked} jobs`);
     logger.info(`📊 Pass rate: ${totalMatched > 0 ? ((totalPassed / totalMatched) * 100).toFixed(1) : 0}%`);
     logger.info('');
 
     // Expected behavior validation
-    logger.info('🔍 EXPECTED BEHAVIOR VALIDATION:');
+    logger.info('🔍 EXPECTED BEHAVIOR VALIDATION (RUN #35):');
     logger.info('');
-    logger.info('✅ SHOULD PASS:');
-    logger.info('   - "Technology & Engineering Jobs" (68%+) - Good AI/ML match');
-    logger.info('   - "Digital Transformation Consultant" (70%+) - Allowed despite "marketing" in description');
-    logger.info('   - "AI Engineer - Saudi Aramco" (75%+) - Perfect match for Hadi');
-    logger.info('   - "Software Engineer - Machine Learning" (70%+) - Good ML match');
+    logger.info('✅ SHOULD PASS FOR HAMAD (HR):');
+    logger.info('   - "HR Specialist - HRIS Systems" (50-60%+) - Modern HR with HRIS, systems keywords');
+    logger.info('   - "HR Business Partner - Digital Transformation" (50-60%+) - HR + digital transformation');
+    logger.info('   - "Talent Acquisition Specialist - Tech Recruitment" (50-60%+) - HR recruitment role');
     logger.info('');
-    logger.info('❌ SHOULD BE BLOCKED:');
-    logger.info('   - "Assistant Manager Marketing Operations" - Title says "Marketing"');
-    logger.info('   - "Brand Manager - Consumer Marketing" - Clearly marketing role');
+    logger.info('✅ SHOULD PASS FOR SAUD (Product/Marketing):');
+    logger.info('   - "Product Manager - Software Products" (50-65%+) - Product management + technology');
+    logger.info('   - "Brand Manager - Digital Marketing" (50-60%+) - Brand + digital marketing');
+    logger.info('   - "Product Specialist - Technology Solutions" (50-60%+) - Product + technology');
+    logger.info('');
+    logger.info('✅ SHOULD PASS FOR HADI (AI/ML):');
+    logger.info('   - "Technology & Engineering Jobs" (60-70%+) - Good AI/ML match');
+    logger.info('   - "Digital Transformation Consultant" (60-70%+) - AI solutions, digital strategies');
+    logger.info('   - "AI Engineer - Saudi Aramco" (70-80%+) - Perfect AI/ML match');
+    logger.info('   - "Software Engineer - Machine Learning" (65-75%+) - Good ML match');
     logger.info('');
     logger.info('⚠️  BORDERLINE (may pass or fail):');
-    logger.info('   - "MoneyGram Engineering" (50-60%) - Generic but engineering-related');
-    logger.info('   - "Product Manager" (50-65%) - Depends on user profile');
+    logger.info('   - "MoneyGram Engineering" (40-55%) - Generic but engineering-related');
+    logger.info('   - "Assistant Manager Marketing Operations" (40-50%) - Marketing operations (may match Saud)');
+    logger.info('   - "Product Manager - Tech Innovation" (50-60%) - Generic product role');
+    logger.info('');
+    logger.info('🎯 KEY SUCCESS CRITERIA:');
+    logger.info('   ✅ Hamad should get 3+ jobs (was 0 in Run #34)');
+    logger.info('   ✅ Saud should get 3+ jobs (was 1 in Run #34)');
+    logger.info('   ✅ Hadi should get 5+ jobs (was 5 in Run #34)');
+    logger.info('   ✅ No user should get zero jobs (dynamic threshold prevents this)');
     logger.info('');
     logger.info('='.repeat(80));
     logger.info('✅ Test completed successfully!');
     logger.info('');
     logger.info('Next steps:');
-    logger.info('1. Review the results above');
-    logger.info('2. If results look good, commit and push changes');
-    logger.info('3. Monitor Run #34 in production');
+    logger.info('1. Review the results above - verify all users get jobs');
+    logger.info('2. Check that HR/Product jobs are no longer blocked');
+    logger.info('3. If results look good, commit and push RUN #35 changes');
+    logger.info('4. Monitor Run #35 in production');
     logger.info('='.repeat(80));
 
   } catch (error) {

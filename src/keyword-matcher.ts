@@ -68,8 +68,91 @@ export class KeywordJobMatcher {
     ['saas', ['software as a service']],
   ]);
 
+  // ✅ RUN #35: Skill synonym expansion map
+  // Matches similar skills even with different naming conventions
+  // Example: Job says "React.js" but profile says "React" → MATCH!
+  private skillSynonyms: Map<string, string[]> = new Map([
+    // Technical skills - JavaScript ecosystem
+    ['react', ['react', 'reactjs', 'react.js', 'react js', 'react native', 'react-native']],
+    ['node', ['node', 'nodejs', 'node.js', 'node js', 'expressjs', 'express.js']],
+    ['javascript', ['javascript', 'js', 'es6', 'es2015', 'ecmascript', 'typescript', 'ts']],
+    ['typescript', ['typescript', 'ts', 'javascript', 'js']],
+    ['vue', ['vue', 'vuejs', 'vue.js', 'vue js']],
+    ['angular', ['angular', 'angularjs', 'angular js']],
+
+    // Python ecosystem
+    ['python', ['python', 'py', 'python3', 'python 3', 'django', 'flask', 'fastapi']],
+    ['django', ['django', 'python web framework', 'python framework']],
+
+    // Containerization & Cloud
+    ['docker', ['docker', 'containerization', 'containers', 'docker compose']],
+    ['kubernetes', ['kubernetes', 'k8s', 'k8', 'kube', 'container orchestration']],
+    ['aws', ['aws', 'amazon web services', 'amazon cloud', 'ec2', 's3', 'lambda']],
+    ['azure', ['azure', 'microsoft azure', 'microsoft cloud', 'azure devops']],
+    ['gcp', ['gcp', 'google cloud', 'google cloud platform', 'firebase']],
+
+    // Databases
+    ['sql', ['sql', 'mysql', 'postgresql', 'postgres', 'mssql', 'oracle', 'database']],
+    ['mongodb', ['mongodb', 'mongo', 'nosql', 'document database']],
+    ['redis', ['redis', 'caching', 'cache', 'in-memory database']],
+
+    // DevOps & CI/CD
+    ['devops', ['devops', 'dev ops', 'development operations', 'ci/cd', 'cicd']],
+    ['jenkins', ['jenkins', 'ci/cd', 'continuous integration', 'automation']],
+    ['git', ['git', 'github', 'gitlab', 'version control', 'source control']],
+
+    // HR skills - Systems & Tools
+    ['hr', ['hr', 'human resources', 'people operations', 'talent management', 'people & culture', 'people and culture']],
+    ['hris', ['hris', 'hr information systems', 'hr systems', 'hr software', 'hrms']],
+    ['workday', ['workday', 'hris', 'hr information system', 'hr system']],
+    ['successfactors', ['successfactors', 'sap successfactors', 'sap', 'hris']],
+    ['oracle hcm', ['oracle hcm', 'oracle', 'hcm', 'human capital management', 'hris']],
+
+    // HR skills - Functions
+    ['recruitment', ['recruitment', 'hiring', 'talent acquisition', 'recruiting', 'sourcing']],
+    ['onboarding', ['onboarding', 'employee onboarding', 'new hire', 'orientation']],
+    ['payroll', ['payroll', 'compensation', 'payroll management', 'payroll processing']],
+    ['employee relations', ['employee relations', 'er', 'employee engagement', 'workplace culture']],
+    ['learning and development', ['learning and development', 'l&d', 'training', 'professional development', 'learning & development']],
+
+    // Product/Marketing skills - Core
+    ['product', ['product', 'product management', 'pm', 'product owner', 'po', 'product strategy']],
+    ['product management', ['product management', 'product manager', 'pm', 'product owner']],
+    ['marketing', ['marketing', 'brand', 'digital marketing', 'growth marketing', 'marketing strategy', 'content marketing']],
+    ['brand', ['brand', 'branding', 'brand management', 'brand strategy', 'brand identity']],
+
+    // Marketing skills - Digital
+    ['seo', ['seo', 'search engine optimization', 'search optimization', 'organic search']],
+    ['sem', ['sem', 'search engine marketing', 'paid search', 'ppc', 'pay per click']],
+    ['analytics', ['analytics', 'google analytics', 'data analysis', 'reporting', 'web analytics']],
+    ['social media', ['social media', 'social media marketing', 'smm', 'social marketing']],
+    ['content marketing', ['content marketing', 'content strategy', 'content creation', 'copywriting']],
+
+    // Business & Strategy
+    ['business development', ['business development', 'bd', 'biz dev', 'sales', 'partnerships']],
+    ['strategy', ['strategy', 'strategic planning', 'business strategy', 'strategic management']],
+    ['project management', ['project management', 'pm', 'project manager', 'program management']],
+  ]);
+
   constructor(profile: UserProfile) {
     this.profile = profile;
+  }
+
+  /**
+   * ✅ RUN #35: Expand a skill with its synonyms for broader matching
+   * Helps match variations like "React" vs "React.js" vs "ReactJS"
+   */
+  private expandSkillSynonyms(skill: string): string[] {
+    const skillLower = skill.toLowerCase();
+
+    // Check if skill matches any key in synonym map
+    for (const [key, synonyms] of this.skillSynonyms) {
+      if (skillLower.includes(key) || synonyms.some(syn => skillLower.includes(syn))) {
+        return synonyms;
+      }
+    }
+
+    return [skill]; // Return original if no synonyms found
   }
 
   /**
@@ -89,145 +172,26 @@ export class KeywordJobMatcher {
   }
 
   /**
-   * Check if job contains cross-domain keywords that conflict with profile
-   * NOW CHECKS BOTH TITLE AND DESCRIPTION for maximum accuracy
+   * ✅ RUN #35: Cross-Domain Filtering COMPLETELY DISABLED
+   *
+   * Previous Issues:
+   * - Blocked "HR Specialist - HRIS Systems" (has "systems" keyword)
+   * - Blocked "Product Manager - Software Products" (has "software" keyword)
+   * - Blocked "Brand Manager - Digital Marketing" (has "digital" keyword)
+   *
+   * User Decision: Remove ALL cross-domain filters
+   * Rationale: Trust Google CSE personalization + role matching + 40% threshold
+   *
+   * Modern jobs naturally mention cross-domain keywords:
+   * - HR jobs use HRIS, Workday, digital systems
+   * - Product Managers work with software teams
+   * - Brand Managers handle digital marketing
+   *
+   * Let scoring and threshold handle quality control.
    */
   private hasCrossDomainConflict(job: Job): boolean {
-    const titleLower = job.title.toLowerCase();
-    const descLower = (job.description || '').toLowerCase();
-    const combinedText = `${titleLower} ${descLower}`; // Check BOTH title and description
-    const targetRolesStr = this.profile.target_roles.join(' ').toLowerCase();
-
-    // Define domain-specific keywords (COMPREHENSIVE LIST - FIX FOR CROSS-DOMAIN FILTERING)
-    const itKeywords = [
-      // Original keywords
-      'software', 'developer', 'programming', 'ai engineer', 'ml engineer',
-      'data scientist', 'devops', 'full stack', 'frontend', 'backend',
-      'digital transformation', 'machine learning', 'artificial intelligence',
-
-      // Web development (ALL VARIANTS)
-      'web developer', 'web engineer', 'web dev', 'web application', 'webdev',
-      'website developer', 'web programmer',
-
-      // Backend development (ALL VARIANTS)
-      'backend developer', 'backend engineer', 'back end', 'back-end',
-      'backend programmer', 'server side developer',
-
-      // Frontend development (ALL VARIANTS)
-      'frontend developer', 'frontend engineer', 'front end', 'front-end',
-      'ui developer', 'frontend programmer',
-
-      // Full stack (ALL VARIANTS)
-      'full stack developer', 'fullstack', 'full-stack', 'full stack engineer',
-      'full-stack engineer', 'fullstack developer',
-
-      // API and cloud
-      'api developer', 'api engineer', 'rest api', 'graphql', 'api designer',
-      'cloud engineer', 'cloud architect', 'cloud developer',
-      'aws', 'azure', 'gcp', 'cloud infrastructure', 'cloud specialist',
-
-      // Database and infrastructure
-      'database administrator', 'database engineer', 'dba', 'sql developer',
-      'database developer', 'database specialist',
-      'infrastructure engineer', 'systems engineer', 'network engineer',
-      'system administrator', 'devops engineer',
-
-      // Mobile development
-      'mobile developer', 'android developer', 'ios developer',
-      'mobile engineer', 'app developer', 'mobile app',
-      'react native', 'flutter developer', 'swift developer', 'kotlin developer',
-
-      // QA and testing
-      'qa engineer', 'quality assurance', 'test engineer', 'automation engineer',
-      'software tester', 'qa analyst', 'testing engineer',
-
-      // Security
-      'security engineer', 'cybersecurity', 'penetration tester',
-      'security analyst', 'infosec', 'appsec',
-
-      // Blockchain and emerging tech
-      'blockchain developer', 'smart contract', 'web3 developer',
-      'cryptocurrency', 'solidity developer',
-
-      // Generic IT roles
-      'software engineer', 'coding', 'programmer', 'coder',
-      'tech lead', 'engineering manager', 'technical lead',
-      'it specialist', 'it engineer', 'technology',
-
-      // Platform and operations
-      'platform engineer', 'sre', 'site reliability', 'operations engineer',
-      'kubernetes', 'docker', 'containerization',
-
-      // ✅ QUALITY FIX #2: MLOps and DevOps keywords (prevent Marketing Operations → MLOps)
-      'mlops', 'ml ops', 'machine learning ops', 'machine learning operations',
-      'devops engineer', 'sre engineer', 'platform ops'
-    ];
-
-    const hrKeywords = ['hr specialist', 'hr generalist', 'hr officer', 'recruitment',
-                       'payroll', 'hris', 'employee relations', 'hr business partner'];
-
-    // ✅ QUALITY FIX #2: Marketing keywords (prevent Marketing → IT/ML matches)
-    const marketingKeywords = [
-      'marketing manager', 'marketing operations', 'marketing specialist',
-      'brand manager', 'product marketing', 'digital marketing',
-      'content marketing', 'marketing automation', 'campaign manager',
-      'marketing director', 'marketing coordinator'
-    ];
-
-    // If profile is HR-focused but job has IT keywords → reject
-    if (targetRolesStr.includes('hr') && !targetRolesStr.includes('software')) {
-      if (itKeywords.some(k => combinedText.includes(k))) {  // ✅ Check BOTH title and description
-        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - HR profile getting IT job`);
-        return true; // HR profile getting IT job
-      }
-    }
-
-    // If profile is IT-focused but job has HR keywords → reject
-    if ((targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
-         targetRolesStr.includes('ai') || targetRolesStr.includes('engineer')) &&
-        !targetRolesStr.includes('hr')) {
-      if (hrKeywords.some(k => combinedText.includes(k))) {  // ✅ Check BOTH title and description
-        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - IT profile getting HR job`);
-        return true; // IT profile getting HR job
-      }
-    }
-
-    // If profile is Marketing-focused but job has IT/HR keywords → reject
-    if ((targetRolesStr.includes('product') || targetRolesStr.includes('marketing') ||
-         targetRolesStr.includes('brand')) &&
-        !targetRolesStr.includes('software') && !targetRolesStr.includes('hr')) {
-      if (itKeywords.some(k => combinedText.includes(k)) ||  // ✅ Check BOTH title and description
-          hrKeywords.some(k => combinedText.includes(k))) {
-        logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - Product/Marketing profile getting IT/HR job`);
-        return true; // Marketing profile getting IT/HR job
-      }
-    }
-
-    // ✅ RUN #34 FIX: Relaxed filter - check TITLE ONLY (not description) + allow Digital Transformation jobs
-    // Block if: IT/ML profile + Marketing title + NOT a transformation job
-    if ((targetRolesStr.includes('mlops') || targetRolesStr.includes('ai') ||
-         targetRolesStr.includes('software') || targetRolesStr.includes('developer') ||
-         targetRolesStr.includes('engineer')) &&
-        !targetRolesStr.includes('marketing') && !targetRolesStr.includes('product')) {
-
-      // Check if job title has marketing keywords
-      if (marketingKeywords.some(k => titleLower.includes(k))) {
-        // ✅ EXCEPTION: Allow if job title ALSO contains transformation/digital keywords
-        const isTransformationJob = titleLower.includes('transformation') ||
-                                    titleLower.includes('digital') ||
-                                    titleLower.includes('innovation') ||
-                                    titleLower.includes('strategy');
-
-        if (!isTransformationJob) {
-          logger.debug(`[Cross-Domain Blacklist] REJECTED: "${job.title}" - ML/IT profile getting Marketing job`);
-          return true; // Block: IT/ML profile getting pure Marketing job
-        } else {
-          logger.debug(`[Cross-Domain Blacklist] ALLOWED: "${job.title}" - Marketing + Transformation/Digital job for IT/ML profile`);
-        }
-      }
-    }
-
-    return false; // No conflict
+    // ✅ RUN #35: DISABLED - Always return false (no filtering)
+    return false;
   }
 
   /**
@@ -251,12 +215,13 @@ export class KeywordJobMatcher {
       return { score: 0, matchReasons: ['Not in user domain (missing required HR/Product/IT keywords)'] };
     }
 
-    // 0B. ✅ QUALITY FIX #1: RE-ENABLED Cross-Domain Blacklist
-    // Run #32 showed bad matches: "Marketing Operations" (52%) → "MLOps Engineer"
-    // This prevents Marketing→IT, HR→IT, IT→Marketing contamination
-    if (this.hasCrossDomainConflict(job)) {
-      return { score: 0, matchReasons: ['Job domain conflicts with your profile (IT/HR/Marketing mismatch)'] };
-    }
+    // 0B. ✅ RUN #35: Cross-Domain Filtering DISABLED (user decision)
+    // Previously blocked modern HR/Product jobs that mention technology keywords
+    // Now trust Google CSE personalization + role matching + 40% threshold
+    //
+    // if (this.hasCrossDomainConflict(job)) {
+    //   return { score: 0, matchReasons: ['Job domain conflicts with your profile'] };
+    // }
 
     // 1. Title Match (40 points max) - MANDATORY FILTER
     const titleResult = this.scoreTitleMatch(job.title);
@@ -357,6 +322,33 @@ export class KeywordJobMatcher {
   }
 
   /**
+   * ✅ RUN #35: Fuzzy match entire job title using Levenshtein distance
+   * Matches similar titles even with slight differences
+   *
+   * Examples:
+   * - "Product Manager" matches "Product Management Specialist" (85% similarity)
+   * - "HR Specialist" matches "Human Resources Specialist" (75% similarity)
+   * - "Brand Manager" matches "Senior Brand Manager" (80% similarity)
+   */
+  private fuzzyMatchTitle(jobTitle: string, targetRole: string): number {
+    const titleLower = jobTitle.toLowerCase();
+    const roleLower = targetRole.toLowerCase();
+
+    const distance = this.levenshteinDistance(titleLower, roleLower);
+    const maxLength = Math.max(titleLower.length, roleLower.length);
+    const similarity = 1 - (distance / maxLength);
+
+    // Return points if similarity >= 70% (matches similar but not identical titles)
+    if (similarity >= 0.7) {
+      const score = Math.round(similarity * 40); // 70% = 28 points, 100% = 40 points
+      logger.debug(`[Fuzzy Match] "${jobTitle}" ~= "${targetRole}" (${Math.round(similarity * 100)}% similarity → ${score} pts)`);
+      return score;
+    }
+
+    return 0;
+  }
+
+  /**
    * Score job title match with fuzzy logic (0-40 points)
    * Improved to handle partial matches and typos
    */
@@ -403,31 +395,59 @@ export class KeywordJobMatcher {
       }
     }
 
+    // ✅ RUN #35: Fuzzy matching fallback if no word-based match found
+    // Helps match similar titles like "Product Manager" → "Product Management Specialist"
+    if (bestScore === 0) {
+      for (const role of this.profile.target_roles) {
+        const fuzzyScore = this.fuzzyMatchTitle(title, role);
+        if (fuzzyScore > bestScore) {
+          bestScore = fuzzyScore;
+          bestRole = role;
+        }
+      }
+    }
+
     return { score: bestScore, matchedRole: bestRole };
   }
 
   /**
-   * Find primary skills in job description
+   * Find primary skills in job description (✅ RUN #35: Now with synonym expansion)
    */
   private findSkills(description: string): string[] {
     // Expand abbreviations in description before matching (ML → machine learning)
     const expandedDesc = this.expandWithAbbreviations(description);
 
-    return this.profile.skills.primary.filter(skill =>
-      expandedDesc.includes(skill.toLowerCase())
-    );
+    // ✅ RUN #35: Check skill + all its synonyms for broader matching
+    const found: string[] = [];
+    for (const skill of this.profile.skills.primary) {
+      const synonyms = this.expandSkillSynonyms(skill);
+      if (synonyms.some(syn => expandedDesc.includes(syn))) {
+        found.push(skill);
+        logger.debug(`[Skill Match] Found "${skill}" (or synonym: ${synonyms.filter(s => expandedDesc.includes(s)).join(', ')}) in job description`);
+      }
+    }
+
+    return found;
   }
 
   /**
-   * Find technologies in job description
+   * Find technologies in job description (✅ RUN #35: Now with synonym expansion)
    */
   private findTechnologies(description: string): string[] {
     // Expand abbreviations in description before matching (API → application programming interface)
     const expandedDesc = this.expandWithAbbreviations(description);
 
-    return this.profile.skills.technologies.filter(tech =>
-      expandedDesc.includes(tech.toLowerCase())
-    );
+    // ✅ RUN #35: Check technology + all its synonyms for broader matching
+    const found: string[] = [];
+    for (const tech of this.profile.skills.technologies) {
+      const synonyms = this.expandSkillSynonyms(tech);
+      if (synonyms.some(syn => expandedDesc.includes(syn))) {
+        found.push(tech);
+        logger.debug(`[Tech Match] Found "${tech}" (or synonym: ${synonyms.filter(s => expandedDesc.includes(s)).join(', ')}) in job description`);
+      }
+    }
+
+    return found;
   }
 
   /**

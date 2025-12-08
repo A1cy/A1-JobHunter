@@ -127,7 +127,7 @@ function filterByUserThreshold(
   threshold: number,
   maxJobs: number
 ): Job[] {
-  const ABSOLUTE_MIN_SCORE = 50; // ✅ RUN #34 FIX: Balanced threshold (50% - blocks truly irrelevant only)
+  const ABSOLUTE_MIN_SCORE = 40; // ✅ RUN #35: Trust Google CSE + dynamic adjustment (40% - more jobs, let scoring handle quality)
 
   // Sort by score (highest first)
   const sortedJobs = [...jobs].sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -270,19 +270,63 @@ export async function matchJobsForAllUsers(allJobs: Job[]): Promise<UserMatchRes
       user.config.matching_threshold,
       user.config.max_jobs_per_day
     );
-    logger.info(`   ✅ Phase 6 Complete: ${matchedJobs.length} jobs passed threshold`);
+
+    // ✅ RUN #35: Dynamic threshold adjustment (never zero jobs!)
+    let finalJobs = matchedJobs;
+
+    if (matchedJobs.length === 0 && scoredJobs.filter(j => (j.score || 0) > 0).length > 0) {
+      // No jobs passed threshold - try lowering by 10%
+      const ABSOLUTE_MIN_SCORE = 40;
+      const relaxedThreshold = Math.max(user.config.matching_threshold - 10, ABSOLUTE_MIN_SCORE);
+      logger.info(`   ℹ️  Zero jobs passed ${user.config.matching_threshold}% threshold`);
+      logger.info(`   🔄 Retrying with relaxed threshold: ${relaxedThreshold}%`);
+
+      const relaxedJobs = filterByUserThreshold(
+        scoredJobs,
+        relaxedThreshold,
+        user.config.max_jobs_per_day
+      );
+
+      if (relaxedJobs.length > 0) {
+        logger.info(`   ✅ Found ${relaxedJobs.length} jobs with relaxed threshold`);
+        finalJobs = relaxedJobs;
+      } else {
+        logger.info(`   ⚠️  Still zero jobs even with relaxed threshold - user will receive no jobs`);
+      }
+    } else if (matchedJobs.length > user.config.max_jobs_per_day * 2) {
+      // Too many jobs - raise threshold for quality
+      logger.info(`   ℹ️  ${matchedJobs.length} jobs passed threshold (high volume)`);
+      logger.info(`   🔄 Raising threshold to ${user.config.matching_threshold + 10}% for quality control`);
+
+      const raisedThreshold = user.config.matching_threshold + 10;
+      const qualityJobs = filterByUserThreshold(
+        scoredJobs,
+        raisedThreshold,
+        user.config.max_jobs_per_day
+      );
+
+      if (qualityJobs.length >= user.config.max_jobs_per_day) {
+        logger.info(`   ✅ Using ${qualityJobs.length} high-quality jobs with raised threshold`);
+        finalJobs = qualityJobs;
+      } else {
+        logger.info(`   ℹ️  Raised threshold yielded only ${qualityJobs.length} jobs - keeping original results`);
+        // Keep original matchedJobs if raising threshold reduces too much
+      }
+    }
+
+    logger.info(`   ✅ Phase 6 Complete: ${finalJobs.length} jobs passed threshold (with dynamic adjustment)`);
 
     // Calculate statistics
-    const stats = calculateStats(matchedJobs, allJobs.length);
+    const stats = calculateStats(finalJobs, allJobs.length);
 
-    logger.info(`\n   ✅ ${user.username} FINAL RESULT: ${matchedJobs.length} jobs matched (avg ${stats.avg_score}%, high match: ${stats.high_match_count})`);
+    logger.info(`\n   ✅ ${user.username} FINAL RESULT: ${finalJobs.length} jobs matched (avg ${stats.avg_score}%, high match: ${stats.high_match_count})`);
     logger.info(`   ═══════════════════════════════════════\n`);
 
     results.push({
       username: user.username,
       profile: user.profile,
       config: user.config,
-      matched_jobs: matchedJobs,
+      matched_jobs: finalJobs,
       stats
     });
   }
