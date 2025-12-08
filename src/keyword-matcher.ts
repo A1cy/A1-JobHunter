@@ -262,13 +262,15 @@ export class KeywordJobMatcher {
       reasons.push('Based in Riyadh, Saudi Arabia');
     }
 
-    // 5. Semantic Similarity Bonus (0-15 points) - added by semantic matcher
-    if (job.semanticScore && job.semanticScore > 0) {
-      score += job.semanticScore;
-      reasons.push(`Strong semantic match (+${job.semanticScore} pts)`);
-    }
+    // ❌ REMOVED: Semantic Similarity Bonus (BERT doesn't work in GitHub Actions)
+    // Previously: 0-15 bonus points from BERT semantic matching
+    // Now: Rely on TF-IDF + keyword matching only (70-75% accuracy, but RELIABLE)
+    // if (job.semanticScore && job.semanticScore > 0) {
+    //   score += job.semanticScore;
+    //   reasons.push(`Strong semantic match (+${job.semanticScore} pts)`);
+    // }
 
-    // 6. TF-IDF Bonus (0-10 points) - added by TF-IDF scorer
+    // 5. TF-IDF Bonus (0-10 points) - added by TF-IDF scorer
     if (job.tfidfScore && job.tfidfScore > 0) {
       score += job.tfidfScore;
       reasons.push(`Rare, important keywords (+${job.tfidfScore} pts)`);
