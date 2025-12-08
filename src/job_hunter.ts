@@ -164,7 +164,8 @@ async function main() {
         // 🚀 NEW STRATEGY: 3 domain-specific queries for better coverage
         // Instead of 1 query with 30 mixed keywords, run 3 focused queries
         // Benefits: Better domain distribution, more diverse results
-        // API Usage: 3 queries × 4 pages = 12 requests/day (12% of 100 free quota)
+        // API Usage: 3 queries × 10 pages = 30 requests/run (30% of 100 free quota)
+        // Allows: 2-3 manual runs/day + daily cron (total: 60-90 API calls/day)
 
         // 🌐 RUN #34: EXPANDED to 30+ MENA platforms (from 15) for maximum coverage
         // Tier 1: Primary platforms (always include)
@@ -222,8 +223,9 @@ async function main() {
         logger.info(`   Product Query: ${domainQueries[1].keywords.length} keywords`);
         logger.info(`   IT Query: ${domainQueries[2].keywords.length} keywords`);
         logger.info(`   Site filter: 9 job platforms`);
-        logger.info(`   Pages per domain: 1 (reduced from 3 to prevent 429 errors)`);
-        logger.info(`   Expected API usage: 3 requests/run (3% of free quota - SAFE)\n`);
+        logger.info(`   Pages per domain: 10 (optimized for maximum job discovery)`);
+        logger.info(`   Expected API usage: 30 requests/run (30% of free quota)`);
+        logger.info(`   Allows: 2-3 runs/day with safety margin\n`);
 
         // Execute 3 domain-specific queries
         for (const domainQuery of domainQueries) {
@@ -242,14 +244,17 @@ async function main() {
 
           logger.info(`   Keywords: ${domainQuery.keywords.join(', ')}`);
 
-          // ✅ QUOTA FIX: Reduced to 1 page to prevent 429 errors
-          // Previous: 3 pages × 3 domains = 9 API calls (caused 429 errors during testing)
-          // Current: 1 page × 3 domains = 3 API calls (allows 33 runs/day - SAFE)
-          // Trade-off: 30 jobs per run (reliable) vs 90 jobs per run (0 jobs due to 429)
-          for (let page = 0; page < 1; page++) {
-            const startIndex = page * 10 + 1; // 1 (10 results per page)
+          // ✅ QUOTA OPTIMIZATION: Increased to 10 pages for maximum job discovery
+          // Strategy: 10 pages × 3 domains = 30 API calls (30% of daily quota)
+          // Allows: 2-3 runs/day with 10-40% safety margin
+          // Jobs: ~300 jobs per run (10x improvement from 30 jobs)
+          // RUN #36 Context: 429 errors were from rapid testing, NOT production cron
+          // Production runs: 24 hours apart (cron) or 8-12 hours apart (manual)
+          // Rate limiting: 1-second delays prevent hitting rate limits
+          for (let page = 0; page < 10; page++) {
+            const startIndex = page * 10 + 1; // 1, 11, 21, ..., 91
 
-            logger.info(`   📄 Page ${page + 1}/1 (startIndex: ${startIndex})...`);
+            logger.info(`   📄 Page ${page + 1}/10 (startIndex: ${startIndex})...`);
 
             const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(fullQuery)}&start=${startIndex}`;
 
@@ -483,16 +488,16 @@ async function main() {
 
     logger.info('\n🚀 Launching ALL ACTIVE scrapers (Ordered by effectiveness)...\n');
     logger.info('   Strategy: Maximum Riyadh full-time jobs at $0 cost');
-    logger.info('   PRIMARY: Google CSE (3 API calls, 70-80% accuracy)');
+    logger.info('   PRIMARY: Google CSE (30 API calls, 70-80% accuracy)');
     logger.info('   TIER 2: Static RSS feeds (GulfTalent, Naukrigulf, Bayt RSS)');
     logger.info('   TIER 3: Jooble API (aggregates 1000+ boards, 60-70% accuracy)');
     logger.info('   TIER 4: JSearch API (Google Jobs aggregator, 50-60% accuracy)');
     logger.info('   TIER 5: SearchAPI (backup, 50-60% accuracy)');
-    logger.info('   Expected: 100-180 jobs (MAXIMUM delivery at $0 cost)\n');
+    logger.info('   Expected: 370-450 jobs (MAXIMUM delivery at $0 cost)\n');
 
     // ✅ ALL ACTIVE SCRAPERS: Maximum job discovery (5 sources in parallel)
     const scraperResults = await Promise.allSettled([
-      scrapeGoogle(searchKeywords),      // PRIMARY - Google Custom Search (30 jobs, 3 API calls, 70-80% accuracy)
+      scrapeGoogle(searchKeywords),      // PRIMARY - Google Custom Search (300 jobs, 30 API calls, 70-80% accuracy)
       scrapeRSS(searchKeywords),          // TIER 2 - Static RSS feeds (10-20 jobs, 30-40% accuracy)
       scrapeJooble(searchKeywords),       // TIER 3 - Jooble API (30-50 jobs, aggregates 1000+ boards)
       scrapeJSearch(searchKeywords),      // TIER 4 - JSearch API (20-30 jobs, Google Jobs)
@@ -523,12 +528,12 @@ async function main() {
     logger.info(`   Duplicate removal rate: ${jobs.length > 0 ? ((1 - uniqueJobs.length / jobs.length) * 100).toFixed(1) : 0}%`);
     logger.info(`   Sources: ${[...new Set(uniqueJobs.map(j => j.platform))].join(', ')}`);
     logger.info(`   Active Sources (Ordered by effectiveness):`);
-    logger.info(`     PRIMARY: Google Custom Search (3 API calls, 70-80% accuracy)`);
+    logger.info(`     PRIMARY: Google Custom Search (30 API calls, 70-80% accuracy)`);
     logger.info(`     TIER 2: RSS Static Feeds (GulfTalent, Naukrigulf, Bayt RSS)`);
     logger.info(`     TIER 3: Jooble API (aggregates 1000+ job boards)`);
     logger.info(`     TIER 4: JSearch API (Google Jobs aggregator)`);
     logger.info(`     TIER 5: SearchAPI (backup source)`);
-    logger.info(`   Execution time: ~45-120s (5 sources in parallel)`);
+    logger.info(`   Execution time: ~75-150s (5 sources in parallel, Google: 30s)`);
     logger.info(`   Cost: $0 (100% FREE APIs)`);
     logger.info(`   Focus: Maximum Riyadh full-time jobs (QUALITY + QUANTITY)`);
     logger.info(`═══════════════════════════════════════════════════════════\n`);

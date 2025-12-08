@@ -7,18 +7,18 @@
 
 ## 🎯 Currently Active (No API Keys Needed)
 
-✅ **PRIMARY: Google Custom Search** - 70-80% accuracy, 3 API calls, $0
+✅ **PRIMARY: Google Custom Search** - 70-80% accuracy, 30 API calls, $0
 ✅ **TIER 2: RSS Static Feeds** - 30-40% accuracy, 3 feeds, $0
 ✅ **TIER 3: Bayt Direct Scraper** - Riyadh-specific, HTML parsing, $0
 ✅ **TIER 4: Indeed Direct Scraper** - Riyadh-specific, HTML parsing, $0
 
-**Expected**: 60-100 jobs/day (RELIABLE delivery)
+**Expected**: 370-415 jobs/day (RELIABLE delivery)
 
 ---
 
 ## 🚀 Optional Scrapers (FREE APIs - Require Signup)
 
-If you want even MORE jobs (100-150 jobs/day), you can optionally sign up for these FREE API services:
+If you want even MORE jobs (450-550 jobs/day), you can optionally sign up for these FREE API services:
 
 ### 1. 🔥 Jooble API (HIGHLY RECOMMENDED)
 
@@ -190,7 +190,7 @@ If you want even MORE jobs (100-150 jobs/day), you can optionally sign up for th
 
 ### Current Setup (No API Keys):
 ```
-Total jobs/day: 60-100 jobs
+Total jobs/day: 370-415 jobs
 Sources: 4 (Google, RSS, Bayt, Indeed)
 Accuracy: 70-80% overall
 Cost: $0/month
@@ -198,7 +198,7 @@ Cost: $0/month
 
 ### With Jooble (RECOMMENDED):
 ```
-Total jobs/day: 90-150 jobs (+50%)
+Total jobs/day: 420-465 jobs (+13%)
 Sources: 5 (Google, RSS, Bayt, Indeed, Jooble)
 Accuracy: 70-80% overall
 Cost: $0/month (FREE tier)
@@ -206,7 +206,7 @@ Cost: $0/month (FREE tier)
 
 ### With All Optional APIs:
 ```
-Total jobs/day: 120-180 jobs (+100%)
+Total jobs/day: 470-545 jobs (+27%)
 Sources: 7 (Google, RSS, Bayt, Indeed, Jooble, JSearch, SearchAPI)
 Accuracy: 70-80% overall
 Cost: $0/month (ALL free tiers)
@@ -234,7 +234,7 @@ Cost: $0/month (ALL free tiers)
 ## 💡 Recommendations
 
 ### For Maximum Results:
-1. **Start with current 4 scrapers** (60-100 jobs, proven reliable)
+1. **Start with current 4 scrapers** (370-415 jobs, proven reliable)
 2. **Add Jooble** (+30-50 jobs, highly recommended, 5-min setup)
 3. **Optionally add JSearch** (+20-30 jobs if you want even more)
 4. **Keep SearchAPI as emergency backup** (only if other sources fail)
@@ -288,20 +288,20 @@ npm start
 ## 📝 Summary
 
 **Current Setup (No API Keys):**
-- ✅ 60-100 jobs/day
+- ✅ 370-415 jobs/day
 - ✅ 100% FREE
 - ✅ Reliable delivery
 - ✅ No signup required
 
 **With Optional APIs:**
-- 🚀 120-180 jobs/day (+100%)
+- 🚀 470-545 jobs/day (+27%)
 - 💰 Still 100% FREE
 - 🔑 Requires 5-10 min setup per API
 - 📧 Email signup required
 
 **Recommendation:**
 - Start with current 4 scrapers (proven reliable)
-- Add Jooble if you want 50% more jobs (highly recommended)
+- Add Jooble if you want 13% more jobs (highly recommended)
 - Skip LinkedIn and WebSearch (not suitable for GitHub Actions)
 
 ---

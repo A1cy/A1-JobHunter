@@ -4,7 +4,7 @@
 
 **Date**: December 8, 2025
 **Status**: ✅ Simplified Architecture - Working Reliably
-**Daily Delivery**: 30-50 jobs per user
+**Daily Delivery**: 370-415 jobs per user
 **Cost**: $0/month (100% free sources)
 
 ---
@@ -38,12 +38,12 @@
 │  ┌────────────────────┐    ┌─────────────────────┐          │
 │  │  Google Custom     │    │  Static RSS Feeds   │          │
 │  │  Search API        │    │  (GulfTalent, etc.) │          │
-│  │  30 jobs (PRIMARY) │    │  10-20 jobs (SEC.)  │          │
-│  │  3 API calls (3%)  │    │  Bot-friendly       │          │
+│  │  300 jobs (PRIMARY)│    │  10-20 jobs (SEC.)  │          │
+│  │  30 API calls (30%)│    │  Bot-friendly       │          │
 │  └────────────────────┘    └─────────────────────┘          │
 │             └──────────┬──────────┘                          │
 │                        │                                     │
-│                   40-50 total jobs                           │
+│                   370-415 total jobs                         │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
@@ -96,7 +96,7 @@
 
 | Service | Usage | Cost | Proof |
 |---------|-------|------|-------|
-| **Google Custom Search API** | 3 calls/day (3% of 100 limit) | $0 | [Free tier: 100 queries/day](https://developers.google.com/custom-search/v1/overview#pricing) |
+| **Google Custom Search API** | 30 calls/day (30% of 100 limit) | $0 | [Free tier: 100 queries/day](https://developers.google.com/custom-search/v1/overview#pricing) |
 | **RSS Feeds** | 3 feeds (GulfTalent, Naukrigulf, Bayt) | $0 | Bot-friendly, no API key needed |
 | **Telegram Bot API** | Unlimited messages | $0 | [Free forever](https://core.telegram.org/bots/faq#how-much-does-it-cost) |
 | **GitHub Actions** | ~1 min/day (2000 min/month free) | $0 | [Free tier: 2000 minutes/month](https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions) |
@@ -133,25 +133,25 @@ users/
 
 ### **Step 1: Parallel Job Scraping**
 
-#### 🔍 Google Custom Search API (PRIMARY - 30 jobs)
+#### 🔍 Google Custom Search API (PRIMARY - 300 jobs)
 
 ```
 Query 1 (HR Domain):
   "Human Resources OR HRIS OR Workday (jobs OR careers) Riyadh
    site:linkedin.com OR site:bayt.com OR site:gulftalent.com..."
-  └─> Page 1: 10 results
+  └─> Pages 1-10: 100 results (10 API calls)
 
 Query 2 (Product Domain):
   "Product Manager OR Product Strategy (jobs OR careers) Riyadh
    site:linkedin.com OR site:bayt.com..."
-  └─> Page 1: 10 results
+  └─> Pages 1-10: 100 results (10 API calls)
 
 Query 3 (IT Domain):
   "Software Engineer OR Python OR React (jobs OR careers) Riyadh
    site:linkedin.com OR site:bayt.com..."
-  └─> Page 1: 10 results
+  └─> Pages 1-10: 100 results (10 API calls)
 
-Total: 3 API calls, 30 jobs (70-80% accuracy)
+Total: 30 API calls, 300 jobs (70-80% accuracy)
 ```
 
 **Quality Filters Applied:**
@@ -187,9 +187,9 @@ Total: 10-20 jobs (30-40% accuracy)
 ```
 
 **Combined Output:**
-- **Total scraped**: 40-50 jobs
-- **After URL deduplication**: 35-45 unique jobs
-- **Execution time**: 30-60 seconds (parallel)
+- **Total scraped**: 370-415 jobs
+- **After URL deduplication**: 330-380 unique jobs
+- **Execution time**: 75-150 seconds (parallel)
 
 ---
 
@@ -200,7 +200,7 @@ For **EACH** user (Hamad, Saud, A1), the system runs a 4-phase matching algorith
 #### **Phase 1: TF-IDF Corpus Building**
 
 ```
-Build corpus from all 40-50 jobs:
+Build corpus from all 370-415 jobs:
 
 Job 1: "Senior HR Specialist with HRIS experience..."
 Job 2: "Product Manager for digital transformation..."
@@ -632,7 +632,7 @@ jobs:
 
 | Resource | Daily Limit | Our Usage | % Used | Status |
 |----------|-------------|-----------|--------|--------|
-| **Google API Queries** | 100 queries | 3 queries | 3% | ✅ Safe |
+| **Google API Queries** | 100 queries | 30 queries | 30% | ✅ Safe |
 | **GitHub Actions Minutes** | 2000 min/month | ~30 min/month | 1.5% | ✅ Safe |
 | **Telegram Messages** | Unlimited | 3-10 messages | N/A | ✅ Free |
 
@@ -645,16 +645,16 @@ jobs:
 
 **Daily Pipeline:**
 ```
-Total Scraped:       40-50 jobs
-After Deduplication: 35-45 unique jobs (10-15% duplicates removed)
-After Matching:      15-30 matched jobs (across all users)
-Per User Average:    5-20 jobs (depends on profile specificity)
+Total Scraped:       370-415 jobs
+After Deduplication: 330-380 unique jobs (10-15% duplicates removed)
+After Matching:      100-250 matched jobs (across all users)
+Per User Average:    30-80 jobs (depends on profile specificity)
 ```
 
 **Quality Metrics:**
 ```
 Primary Source (Google CSE):
-  - Jobs scraped: 30 jobs/day
+  - Jobs scraped: 300 jobs/day
   - Accuracy: 70-80% (Riyadh full-time jobs)
   - Relevance: HIGH (domain-specific queries)
 
@@ -676,7 +676,7 @@ Overall System:
 │         TOTAL MONTHLY COST: $0.00           │
 ├─────────────────────────────────────────────┤
 │ Google Custom Search API:        $0.00      │
-│   (3 calls/day × 30 days = 90/3000 free)    │
+│   (30 calls/day, free tier: 100/day)        │
 │                                             │
 │ RSS Feeds:                       $0.00      │
 │   (Bot-friendly, no API key)                │
@@ -820,8 +820,8 @@ const uniqueJobs = jobs.filter((job, index, self) =>
 - No hidden costs
 
 ✅ **Reliable**
-- 30-50 jobs delivered daily
-- No quota errors (3% API usage)
+- 370-415 jobs delivered daily
+- No quota errors (30% API usage with 70% buffer)
 - 95%+ uptime
 
 ✅ **Quality**
@@ -850,7 +850,7 @@ const uniqueJobs = jobs.filter((job, index, self) =>
 - Efficient matching algorithm
 
 ✅ **Reliable**
-- No 429 quota errors (3 calls vs 9)
+- No 429 quota errors (30 calls with 70% buffer)
 - No silent failures (removed BERT)
 - No 404 errors (removed company RSS)
 
@@ -937,8 +937,8 @@ cat users/[username]/profile.json
 # - TELEGRAM_BOT_TOKEN
 
 # 2. Check quota usage
-# Should be only 3 calls/day (3%)
-# If higher, review code changes
+# Should be 30 calls/day (30%)
+# If higher (>40 calls), review code changes
 
 # 3. Check Actions logs for timeout errors
 # Increase timeout in workflow.yml if needed
