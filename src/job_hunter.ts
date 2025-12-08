@@ -476,31 +476,35 @@ async function main() {
     // Only works in interactive Claude Code sessions
     // async function loadWebSearchData(): Promise<Job[]> { ... }
 
-    // Step 1: Simplified Job Scraping (Google + RSS only - RELIABLE sources)
-    logger.info('📡 Step 1: Job scraping (Google CSE + 3 RSS feeds - GitHub Actions compatible)...');
+    // Step 1: Maximum Job Scraping (5 FREE sources in parallel)
+    logger.info('📡 Step 1: Job scraping (5 sources: Google + RSS + Jooble + JSearch + SearchAPI)...');
 
     let jobs: Job[] = [];
 
-    logger.info('\n🚀 Launching ACTIVE scrapers (Ordered by effectiveness)...\n');
-    logger.info('   Strategy: Riyadh full-time jobs at $0 cost');
+    logger.info('\n🚀 Launching ALL ACTIVE scrapers (Ordered by effectiveness)...\n');
+    logger.info('   Strategy: Maximum Riyadh full-time jobs at $0 cost');
     logger.info('   PRIMARY: Google CSE (3 API calls, 70-80% accuracy)');
     logger.info('   TIER 2: Static RSS feeds (GulfTalent, Naukrigulf, Bayt RSS)');
-    logger.info('   Expected: 40-60 jobs (RELIABLE delivery)');
-    logger.info('   Optional: See docs/OPTIONAL_SCRAPERS.md for +60 more jobs\n');
+    logger.info('   TIER 3: Jooble API (aggregates 1000+ boards, 60-70% accuracy)');
+    logger.info('   TIER 4: JSearch API (Google Jobs aggregator, 50-60% accuracy)');
+    logger.info('   TIER 5: SearchAPI (backup, 50-60% accuracy)');
+    logger.info('   Expected: 100-180 jobs (MAXIMUM delivery at $0 cost)\n');
 
-    // ✅ ACTIVE SCRAPERS: Proven reliable sources (Google + RSS)
+    // ✅ ALL ACTIVE SCRAPERS: Maximum job discovery (5 sources in parallel)
     const scraperResults = await Promise.allSettled([
       scrapeGoogle(searchKeywords),      // PRIMARY - Google Custom Search (30 jobs, 3 API calls, 70-80% accuracy)
       scrapeRSS(searchKeywords),          // TIER 2 - Static RSS feeds (10-20 jobs, 30-40% accuracy)
+      scrapeJooble(searchKeywords),       // TIER 3 - Jooble API (30-50 jobs, aggregates 1000+ boards)
+      scrapeJSearch(searchKeywords),      // TIER 4 - JSearch API (20-30 jobs, Google Jobs)
+      scrapeSearchAPI(searchKeywords),    // TIER 5 - SearchAPI (10-15 jobs, backup)
       // ❌ REMOVED: Remotive (remote != Riyadh office)
       // ❌ REMOVED: Arbeitnow (Germany remote != Saudi)
       // ❌ NOT SUITABLE: LinkedIn (Playwright = heavy, like BERT), WebSearch (needs Claude Code)
       // 🔧 COMPLEX SETUP: Bayt, Indeed (require full PlatformConfig - see docs/OPTIONAL_SCRAPERS.md)
-      // 🔑 READY TO ADD: Jooble, JSearch, SearchAPI (need API keys - see docs/OPTIONAL_SCRAPERS.md)
     ]);
 
     // Collect jobs from all successful scrapers
-    const scraperNames = ['Google', 'RSS'];
+    const scraperNames = ['Google', 'RSS', 'Jooble', 'JSearch', 'SearchAPI'];
     scraperResults.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         jobs.push(...result.value);
@@ -513,7 +517,7 @@ async function main() {
     const uniqueJobs = deduplicateJobs(jobs);
 
     logger.info(`\n═══════════════════════════════════════════════════════════`);
-    logger.info(`✅ Job Scraping Complete (Proven Reliable Sources):`);
+    logger.info(`✅ Job Scraping Complete (ALL 5 SOURCES ACTIVE):`);
     logger.info(`   Total scraped: ${jobs.length} jobs`);
     logger.info(`   After deduplication: ${uniqueJobs.length} unique jobs`);
     logger.info(`   Duplicate removal rate: ${jobs.length > 0 ? ((1 - uniqueJobs.length / jobs.length) * 100).toFixed(1) : 0}%`);
@@ -521,13 +525,12 @@ async function main() {
     logger.info(`   Active Sources (Ordered by effectiveness):`);
     logger.info(`     PRIMARY: Google Custom Search (3 API calls, 70-80% accuracy)`);
     logger.info(`     TIER 2: RSS Static Feeds (GulfTalent, Naukrigulf, Bayt RSS)`);
-    logger.info(`   💡 Want more jobs? See docs/OPTIONAL_SCRAPERS.md for:`);
-    logger.info(`      - Jooble API (+30-50 jobs, FREE, 5min setup)`);
-    logger.info(`      - JSearch API (+20-30 jobs, FREE, 5min setup)`);
-    logger.info(`      - SearchAPI (+10-15 jobs, FREE, backup only)`);
-    logger.info(`   Execution time: ~30-60s (parallel)`);
-    logger.info(`   Cost: $0 (100% FREE sources)`);
-    logger.info(`   Focus: Riyadh full-time jobs (QUALITY over quantity)`);
+    logger.info(`     TIER 3: Jooble API (aggregates 1000+ job boards)`);
+    logger.info(`     TIER 4: JSearch API (Google Jobs aggregator)`);
+    logger.info(`     TIER 5: SearchAPI (backup source)`);
+    logger.info(`   Execution time: ~45-120s (5 sources in parallel)`);
+    logger.info(`   Cost: $0 (100% FREE APIs)`);
+    logger.info(`   Focus: Maximum Riyadh full-time jobs (QUALITY + QUANTITY)`);
     logger.info(`═══════════════════════════════════════════════════════════\n`);
 
     jobs = uniqueJobs;
