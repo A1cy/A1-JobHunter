@@ -37,6 +37,22 @@ export class JSearchJobScraper {
   }
 
   /**
+   * Validate if location is in Riyadh (HARD REJECT non-Riyadh jobs)
+   */
+  private isRiyadhLocation(location: string): boolean {
+    const locationLower = location.toLowerCase();
+
+    // Accept Riyadh only
+    if (locationLower.includes('riyadh')) {
+      return true;
+    }
+
+    // REJECT all others
+    logger.debug(`❌ [JSearch] Rejected non-Riyadh: ${location}`);
+    return false;
+  }
+
+  /**
    * Search jobs on JSearch API (Google Jobs)
    *
    * @param query - Job query (e.g., "Software Engineer OR AI Engineer")
@@ -75,19 +91,24 @@ export class JSearchJobScraper {
 
           logger.info(`✅ JSearch: "${query}" → ${data.data?.length || 0} jobs`);
 
-          return (data.data || []).map(job => ({
-            id: generateJobId(),
-            title: job.job_title,
-            company: job.employer_name,
-            location: `${job.job_city || ''}, ${job.job_country || ''}`.trim().replace(/^,\s*/, ''),
-            url: job.job_apply_link || '',
-            description: job.job_description || '',
-            postedDate: job.job_posted_at_datetime_utc
-              ? new Date(job.job_posted_at_datetime_utc)
-              : undefined,
-            platform: 'JSearch',
-            source: 'API'
-          }));
+          return (data.data || [])
+            .filter(job => {
+              const location = `${job.job_city || ''}, ${job.job_country || ''}`.trim().replace(/^,\s*/, '');
+              return this.isRiyadhLocation(location);
+            })
+            .map(job => ({
+              id: generateJobId(),
+              title: job.job_title,
+              company: job.employer_name,
+              location: `${job.job_city || ''}, ${job.job_country || ''}`.trim().replace(/^,\s*/, ''),
+              url: job.job_apply_link || '',
+              description: job.job_description || '',
+              postedDate: job.job_posted_at_datetime_utc
+                ? new Date(job.job_posted_at_datetime_utc)
+                : undefined,
+              platform: 'JSearch',
+              source: 'API'
+            }));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.warn(`⚠️  JSearch API error (will retry): ${message}`);

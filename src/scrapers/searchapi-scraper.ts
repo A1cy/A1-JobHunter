@@ -21,6 +21,22 @@ export class SearchAPIJobScraper {
   }
 
   /**
+   * Validate if location is in Riyadh (HARD REJECT non-Riyadh jobs)
+   */
+  private isRiyadhLocation(location: string): boolean {
+    const locationLower = location.toLowerCase();
+
+    // Accept Riyadh only
+    if (locationLower.includes('riyadh')) {
+      return true;
+    }
+
+    // REJECT all others
+    logger.debug(`❌ [SearchAPI] Rejected non-Riyadh: ${location}`);
+    return false;
+  }
+
+  /**
    * Search jobs on SearchAPI.io (Google Jobs)
    *
    * @param query - Job query (e.g., "software developer OR engineer")
@@ -56,16 +72,18 @@ export class SearchAPIJobScraper {
 
           logger.info(`✅ SearchAPI: "${query}" → ${jobs.length} jobs`);
 
-          return jobs.map((job: any) => ({
-            id: generateJobId(),
-            title: job.title || 'No Title',
-            company: job.company_name || 'Unknown Company',
-            location: job.location || location,
-            url: job.apply_link || job.share_link || '',
-            description: job.description || '',
-            platform: 'SearchAPI',
-            source: 'API'
-          }));
+          return jobs
+            .filter((job: any) => this.isRiyadhLocation(job.location || location))
+            .map((job: any) => ({
+              id: generateJobId(),
+              title: job.title || 'No Title',
+              company: job.company_name || 'Unknown Company',
+              location: job.location || location,
+              url: job.apply_link || job.share_link || '',
+              description: job.description || '',
+              platform: 'SearchAPI',
+              source: 'API'
+            }));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.warn(`⚠️  SearchAPI error (will retry): ${message}`);

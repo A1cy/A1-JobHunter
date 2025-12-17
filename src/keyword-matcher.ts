@@ -17,6 +17,14 @@ interface UserProfile {
 export class KeywordJobMatcher {
   private profile: UserProfile;
 
+  /**
+   * Validate if job is in Riyadh (HARD REJECT non-Riyadh jobs)
+   */
+  private isRiyadhJob(location: string): boolean {
+    const locationLower = location.toLowerCase();
+    return locationLower.includes('riyadh');
+  }
+
   // Abbreviation map for matching common job description abbreviations
   private abbreviationMap: Map<string, string[]> = new Map([
     // Existing abbreviations
@@ -209,6 +217,15 @@ export class KeywordJobMatcher {
   scoreJob(job: Job): { score: number; matchReasons: string[] } {
     let score = 0;
     const reasons: string[] = [];
+
+    // 0. HARD LOCATION FILTER (BEFORE ANY SCORING - RIYADH ONLY)
+    if (!this.isRiyadhJob(job.location)) {
+      logger.debug(`❌ [Matcher] Rejected non-Riyadh: "${job.title}" (${job.location})`);
+      return {
+        score: 0,
+        matchReasons: [`Location not in Riyadh (${job.location})`]
+      };
+    }
 
     // 0A. STRICT DOMAIN WHITELIST (FIRST CHECK - PRIMARY FILTER FOR 100% ACCURACY)
     if (!this.matchesUserDomain(job)) {

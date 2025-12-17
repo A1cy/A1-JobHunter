@@ -35,6 +35,22 @@ export class JoobleJobScraper {
   }
 
   /**
+   * Validate if location is in Riyadh (HARD REJECT non-Riyadh jobs)
+   */
+  private isRiyadhLocation(location: string): boolean {
+    const locationLower = location.toLowerCase();
+
+    // Accept Riyadh only
+    if (locationLower.includes('riyadh')) {
+      return true;
+    }
+
+    // REJECT all others
+    logger.debug(`❌ [Jooble] Rejected non-Riyadh: ${location}`);
+    return false;
+  }
+
+  /**
    * Search jobs on Jooble API
    *
    * @param keywords - Job keywords to search (e.g., "AI Engineer")
@@ -67,17 +83,19 @@ export class JoobleJobScraper {
 
           logger.info(`✅ Jooble: "${keywords}" → ${data.jobs?.length || 0} jobs`);
 
-          return (data.jobs || []).map(job => ({
-            id: generateJobId(),
-            title: job.title,
-            company: job.company,
-            location: job.location,
-            url: job.link,
-            description: job.snippet || '',
-            postedDate: job.updated ? new Date(job.updated) : undefined,
-            platform: 'Jooble',
-            source: 'API'
-          }));
+          return (data.jobs || [])
+            .filter(job => this.isRiyadhLocation(job.location))
+            .map(job => ({
+              id: generateJobId(),
+              title: job.title,
+              company: job.company,
+              location: job.location,
+              url: job.link,
+              description: job.snippet || '',
+              postedDate: job.updated ? new Date(job.updated) : undefined,
+              platform: 'Jooble',
+              source: 'API'
+            }));
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           logger.warn(`⚠️  Jooble API error (will retry): ${message}`);

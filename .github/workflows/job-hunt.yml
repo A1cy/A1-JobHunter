@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/
-          key: job-cache-${{ github.run_id }}
+          key: job-cache-v1
           restore-keys: |
             job-cache-
 
@@ -65,13 +65,7 @@ jobs:
         run: |
           npm start
 
-      # Save job cache for future runs to prevent duplicate job notifications
-      - name: Save job cache
-        uses: actions/cache/save@v4
-        if: always()  # Save cache even if workflow fails
-        with:
-          path: .cache/
-          key: job-cache-${{ github.run_id }}
+      # Note: cache@v4 auto-saves on workflow success, no explicit save step needed
 
       - name: Upload results artifact (optional)
         if: success()

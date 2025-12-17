@@ -151,12 +151,13 @@ export class JobCache {
 
   /**
    * Calculate days since a date string
+   * Uses Math.ceil to prevent same-day repetition (23h 59m counts as 1 day)
    */
   private daysSince(dateStr: string): number {
     const date = new Date(dateStr);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }
 
   /**

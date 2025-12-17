@@ -25,8 +25,8 @@ import { RSSJobScraper } from './scrapers/rss-scraper.js';
 import { matchJobsForAllUsers } from './multi-user-matcher.js';
 import { sendToAllUsers, sendErrorNotificationToAllUsers } from './multi-user-telegram.js';
 import { logger, deduplicateJobs, Job, generateJobId } from './utils.js';
-// ❌ REMOVED: Fuzzy dedup not needed with fewer sources (simple URL dedup is sufficient)
-// import { FuzzyDeduplicator } from './utils/fuzzy-dedup.js';
+// ✅ RE-ENABLED: Fuzzy dedup catches job title variations (e.g., "Senior Engineer" vs "Sr Engineer")
+import { FuzzyDeduplicator } from './utils/fuzzy-dedup.js';
 import { createMonitor } from './monitoring.js';
 
 // Load environment variables
@@ -50,6 +50,30 @@ async function saveResults(jobs: any[]): Promise<void> {
   } catch (error) {
     logger.error('Error saving results:', error);
   }
+}
+
+/**
+ * Centralized Riyadh-only location filter (SAFETY NET)
+ * Catches any international jobs that slip through individual scrapers
+ */
+function filterRiyadhJobsOnly(jobs: Job[]): Job[] {
+  const before = jobs.length;
+
+  const riyadhJobs = jobs.filter(job => {
+    const locationLower = job.location.toLowerCase();
+
+    if (locationLower.includes('riyadh')) return true;
+
+    logger.debug(`❌ [Central Filter] Rejected: "${job.title}" (${job.location}) from ${job.platform}`);
+    return false;
+  });
+
+  const removed = before - riyadhJobs.length;
+  if (removed > 0) {
+    logger.info(`🔍 [Central Filter] Removed ${removed} non-Riyadh jobs`);
+  }
+
+  return riyadhJobs;
 }
 
 /**
@@ -518,8 +542,22 @@ async function main() {
       }
     });
 
-    // Simple URL deduplication (fuzzy dedup not needed with fewer sources)
+    // Apply centralized Riyadh-only filter (safety net)
+    logger.info('🔍 Applying centralized Riyadh-only filter...');
+    jobs = filterRiyadhJobsOnly(jobs);
+
+    // Simple URL deduplication
     const uniqueJobs = deduplicateJobs(jobs);
+
+    // Apply fuzzy deduplication (catches job title variations)
+    logger.info('🔍 Applying fuzzy deduplication...');
+    const fuzzyDedup = new FuzzyDeduplicator();
+    const finalJobs = fuzzyDedup.deduplicate(uniqueJobs);
+
+    const fuzzyRemoved = uniqueJobs.length - finalJobs.length;
+    if (fuzzyRemoved > 0) {
+      logger.info(`   Removed ${fuzzyRemoved} similar jobs (e.g., "Senior Engineer" ≈ "Sr Engineer")`);
+    }
 
     logger.info(`\n═══════════════════════════════════════════════════════════`);
     logger.info(`✅ Job Scraping Complete (ALL 5 SOURCES ACTIVE):`);
@@ -538,7 +576,7 @@ async function main() {
     logger.info(`   Focus: Maximum Riyadh full-time jobs (QUALITY + QUANTITY)`);
     logger.info(`═══════════════════════════════════════════════════════════\n`);
 
-    jobs = uniqueJobs;
+    jobs = finalJobs;
 
     // Record scraping metrics
     const jobsBySource: Record<string, number> = {};

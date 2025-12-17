@@ -32,6 +32,35 @@ const STATIC_RSS_FEEDS = [
 
 export class RSSJobScraper {
   /**
+   * Validate if location is in Riyadh (HARD REJECT non-Riyadh cities)
+   */
+  private isRiyadhLocation(location: string): boolean {
+    const locationLower = location.toLowerCase();
+
+    // Accept Riyadh
+    if (locationLower.includes('riyadh')) return true;
+
+    // Accept generic (filtered later by keyword matcher)
+    if (locationLower === 'saudi arabia' || locationLower === '') return true;
+
+    // REJECT specific non-Riyadh Saudi cities
+    const rejectedCities = ['jeddah', 'dammam', 'khobar', 'jubail', 'yanbu', 'tabuk', 'abha'];
+    if (rejectedCities.some(city => locationLower.includes(city))) {
+      logger.debug(`❌ [RSS] Rejected non-Riyadh Saudi city: ${location}`);
+      return false;
+    }
+
+    // REJECT international cities
+    const international = ['dubai', 'abu dhabi', 'cairo', 'kuwait', 'doha', 'manama', 'muscat'];
+    if (international.some(kw => locationLower.includes(kw))) {
+      logger.debug(`❌ [RSS] Rejected international: ${location}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * ✅ RUN #36: Scrape all static RSS feeds (no keyword needed)
    */
   async scrapeAllStaticFeeds(): Promise<Job[]> {
@@ -117,7 +146,7 @@ export class RSSJobScraper {
           }
 
           // Create job object
-          jobs.push({
+          const jobObj = {
             id: generateJobId(),
             title: sanitizeText(jobTitle),
             company: sanitizeText(company),
@@ -127,7 +156,12 @@ export class RSSJobScraper {
             postedDate: pubDate ? new Date(pubDate) : undefined,
             platform: platform,
             source: 'RSS'
-          });
+          };
+
+          // Apply Riyadh-only location filter
+          if (this.isRiyadhLocation(jobObj.location)) {
+            jobs.push(jobObj);
+          }
         } catch (itemError) {
           logger.debug(`RSS item parse error:`, itemError);
         }

@@ -128,7 +128,7 @@ function filterByUserThreshold(
   threshold: number,
   maxJobs: number
 ): Job[] {
-  const ABSOLUTE_MIN_SCORE = 40; // ✅ RUN #35: Trust Google CSE + dynamic adjustment (40% - more jobs, let scoring handle quality)
+  const ABSOLUTE_MIN_SCORE = 50; // ✅ RIYADH-ONLY FIX: Raised to 50% with hard location filtering (higher quality with strict location filter)
 
   // Sort by score (highest first)
   const sortedJobs = [...jobs].sort((a, b) => (b.score || 0) - (a.score || 0));
